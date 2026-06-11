@@ -45,7 +45,7 @@
   .btn-gasto{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity .15s;display:inline-flex;align-items:center;gap:6px;}
   .btn-gasto:hover{opacity:.85;}
 
-  .summary-bar{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);}
+  .summary-bar{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border);}
   .summary-card{background:var(--surface);padding:20px 28px;display:flex;flex-direction:column;gap:5px;border-right:1px solid var(--border);}
   .summary-card:last-child{border-right:none;}
   .summary-card .label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;}
@@ -212,7 +212,7 @@
   <div class="summary-card"><div class="label">💼 Entradas</div><div class="value v-green" id="s-entradas">R$ 0,00</div><div class="sub" id="s-entradas-sub">0 lançamentos</div></div>
   <div class="summary-card"><div class="label">📤 Total Gastos</div><div class="value v-red" id="s-gastos">R$ 0,00</div><div class="sub">em todas as categorias</div></div>
   <div class="summary-card"><div class="label">⚖️ Saldo</div><div class="value" id="s-saldo">R$ 0,00</div><div class="sub" id="s-saldo-pct">—</div></div>
-  <div class="summary-card"><div class="label">🙏 Dízimo (10%)</div><div class="value v-yellow" id="s-dizimo">R$ 0,00</div><div class="sub">das entradas com dízimo</div></div>
+  
 </div>
 
 <div class="action-bar">
@@ -321,6 +321,7 @@
     <div class="balance-block">
       <div class="btitle">Resumo do Mês</div>
       <div class="balance-row"><span class="lbl">Recebido</span><span class="num v-green" id="br-recebido">R$ 0,00</span></div>
+      <div class="balance-row" id="br-dizimo-row" style="display:none;"><span class="lbl">🙏 Dízimo pago</span><span class="num" style="color:var(--yellow)" id="br-dizimo">R$ 0,00</span></div>
       <div class="balance-row"><span class="lbl">Alimentação</span><span class="num" id="br-alim">R$ 0,00</span></div>
       <div class="balance-row"><span class="lbl">Lazer</span><span class="num" id="br-lazer">R$ 0,00</span></div>
       <div class="balance-row"><span class="lbl">Contas Fixas</span><span class="num" id="br-fixas">R$ 0,00</span></div>
@@ -359,6 +360,7 @@
         <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Valor</label><input id="new-fixa-val" type="number" placeholder="0,00" step="0.01" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;width:90px;"></div>
         <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Dia</label><input id="new-fixa-dia" type="number" placeholder="10" min="1" max="31" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:7px;font-size:12px;font-family:'Inter',sans-serif;width:60px;"></div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;"><input type="checkbox" id="new-fixa-indefinido" style="width:auto;"><label for="new-fixa-indefinido" style="font-size:12px;color:var(--muted);margin:0;">Valor indefinido (ex: cartão de crédito)</label></div>
       <button class="btn" style="margin-top:10px;width:100%;" onclick="addFixaTemplate()">+ Adicionar Conta</button>
     </div>
     <div class="modal-actions"><button class="btn secondary" onclick="closeFixasModal()">Fechar</button></div>
@@ -507,7 +509,7 @@ function renderFixas(){
     tr.innerHTML=`
       <td class="date-col">${item.data||'—'}</td>
       <td><div class="desc">${item.desc||''}</div>${who}</td>
-      <td class="val v-red">${brl(item.valor)}</td>
+      <td class="val v-red">${item.valorIndefinido&&!item.pago?'<span style="color:var(--muted);font-size:12px;">? (a definir)</span>':brl(item.valor)}</td>
       <td><button class="pago-toggle ${pago?'pago':'pendente'}" onclick="window.togglePago('${item._key}',${pago})">${pago?'✓ Pago':'⏳ Pendente'}</button></td>
       <td><div class="action-btns">
         <button class="icon-btn" onclick="window.editItem('fixa','${item._key}')">✏️</button>
@@ -518,7 +520,39 @@ function renderFixas(){
 }
 
 window.togglePago=function(key,current){
-  update(ref(db,`meses/${currentMonth}/fixas/${key}`),{pago:!current});
+  const item=localData.fixas.find(f=>f._key===key);
+  if(!current && item && item.valorIndefinido){
+    // paying an indefinido — ask for the real value
+    const realVal=parseFloat(prompt('Qual o valor desta fatura?',''));
+    if(isNaN(realVal)||realVal<=0){ alert('Informe um valor válido.'); return; }
+    update(ref(db,`meses/${currentMonth}/fixas/${key}`),{pago:true,valor:realVal});
+    showToast('✅ Conta paga — R$ '+realVal.toFixed(2).replace('.',','));
+  } else {
+    update(ref(db,`meses/${currentMonth}/fixas/${key}`),{pago:!current});
+  }
+  setSyncStatus('syncing','Salvando...');
+};
+
+// Called when user clicks SIM/NÃO on dizimo in entrada row
+window.toggleDizimo=function(key,current){
+  const newVal=!current;
+  update(ref(db,`meses/${currentMonth}/entradas/${key}`),{dizimo:newVal});
+  const entry=localData.entradas.find(e=>e._key===key);
+  if(!entry) return;
+  const dizimoVal=parseFloat(entry.valor||0)*0.10;
+  const mesStr=currentMonth.split('-')[1];
+  // Remove existing auto-dizimo for this entry if exists
+  const existingDizimo=localData.fixas.find(f=>f.dizimoEntradaKey===key);
+  if(existingDizimo) remove(ref(db,`meses/${currentMonth}/fixas/${existingDizimo._key}`));
+  if(newVal){
+    // Add dizimo as conta fixa paga
+    push(ref(db,`meses/${currentMonth}/fixas`),{
+      data:'',desc:'🙏 Dízimo — '+( entry.origem||entry.servico||'Entrada'),
+      valor:dizimoVal,pago:true,who:entry.who||'dudu',
+      dizimoEntradaKey:key,isAutoDizimo:true
+    });
+    showToast('🙏 Dízimo de '+brl(dizimoVal)+' adicionado!');
+  }
   setSyncStatus('syncing','Salvando...');
 };
 
@@ -531,7 +565,11 @@ function renderTable(tbodyId, arr, type){
     const who=item.who?`<span class="badge-who ${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>`:'';
     const actions=`<div class="action-btns"><button class="icon-btn" onclick="window.editItem('${type}','${item._key}')">✏️</button><button class="icon-btn del" onclick="window.deleteItem('${type}','${item._key}')">×</button></div>`;
     if(type==='entrada'){
-      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.origem||''}</div></td><td><div class="desc">${item.servico||''}</div></td><td>${item.dizimo?'<span class="badge-dizimo">SIM</span>':''} ${who}</td><td class="val v-green">${brl(item.valor)}</td><td>${actions}</td>`;
+      const dizimoVal=item.dizimo===true;
+      const dizimoLabel=dizimoVal?'SIM':'NÃO';
+      const dizimoStyle=dizimoVal?'background:#22c55e18;color:#22c55e;':'background:#ef444418;color:#f87171;';
+      const dizimoBadge=`<button onclick="window.toggleDizimo('${item._key}',${dizimoVal})" style="border:none;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;cursor:pointer;${dizimoStyle}">${dizimoLabel}</button>`;
+      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.origem||''}</div></td><td><div class="desc">${item.servico||''}</div></td><td>${dizimoBadge} ${who}</td><td class="val v-green">${brl(item.valor)}</td><td>${actions}</td>`;
     } else {
       tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.desc||''}</div>${who}</td><td class="val v-red">${brl(item.valor)}</td><td>${actions}</td>`;
     }
@@ -586,14 +624,17 @@ function renderAll(){
   renderTable('tbody-investimentos', localData.investimentos, 'investimento');
   renderIndefinidos();
 
-  const tE=sum(localData.entradas), tF=sum(localData.fixas), tI=sum(localData.imprevistos),
+  const tE=sum(localData.entradas), tF=sum(localData.fixas.filter(f=>f.pago===true)), tI=sum(localData.imprevistos),
         tA=sum(localData.alimentacao), tL=sum(localData.lazer), tT=sum(localData.transporte),
         tC=sum(localData.casa), tIn=sum(localData.investimentos);
   const totalG=tF+tI+tA+tL+tT+tC+tIn;
   const saldo=tE-totalG;
 
   document.getElementById('total-entradas').textContent=brl(tE);
-  document.getElementById('total-fixas').textContent=brl(tF);
+  // fixas: show paid + pending label
+  const tFAll=sum(localData.fixas); const tFPend=tFAll-tF;
+  const fixasTotalEl=document.getElementById('total-fixas');
+  if(fixasTotalEl){ fixasTotalEl.innerHTML=brl(tF)+(tFPend>0?` <span style="color:var(--muted);font-size:11px;">(+${brl(tFPend)} pend.)</span>`:''); }
   document.getElementById('total-imprevistos').textContent=brl(tI);
   document.getElementById('total-alimentacao').textContent=brl(tA);
   document.getElementById('total-lazer').textContent=brl(tL);
@@ -606,8 +647,7 @@ function renderAll(){
   document.getElementById('s-gastos').textContent=brl(totalG);
   const sEl=document.getElementById('s-saldo'); sEl.textContent=brl(saldo); sEl.className='value '+(saldo>=0?'v-green':'v-red');
   document.getElementById('s-saldo-pct').textContent=tE>0?((totalG/tE)*100).toFixed(0)+'% do recebido gasto':'—';
-  const dBase=localData.entradas.filter(e=>e.dizimo).reduce((a,i)=>a+parseFloat(i.valor||0),0);
-  document.getElementById('s-dizimo').textContent=brl(dBase*0.10);
+
   document.getElementById('br-recebido').textContent=brl(tE);
   document.getElementById('br-alim').textContent=brl(tA);
   document.getElementById('br-lazer').textContent=brl(tL);
@@ -646,20 +686,27 @@ function subscribeFixasTemplate(){
   });
 }
 
-// Seed fixas from template at start of month if fixas is empty
+// Seed fixas from template — adds missing ones even if month already has some
 async function seedFixasFromTemplate(month){
   onValue(ref(db,`meses/${month}/fixas`),snap=>{
-    if(!snap.val() && fixasTemplate.length>0){
-      fixasTemplate.forEach(t=>{
+    const existing=snap.val()?Object.values(snap.val()).map(v=>(v.desc||'').toLowerCase()):[];
+    const mesStr=month.split('-')[1];
+    fixasTemplate.forEach(t=>{
+      // Skip auto-dizimo entries and skip if name already exists in month
+      if(t.isAutoDizimo) return;
+      const nomeLower=(t.nome||'').toLowerCase();
+      const alreadyExists=existing.some(e=>e===nomeLower);
+      if(!alreadyExists){
         push(ref(db,`meses/${month}/fixas`),{
-          data:t.dia?String(t.dia).padStart(2,'0')+'/'+month.split('-')[1]:'',
+          data:t.dia?String(t.dia).padStart(2,'0')+'/'+mesStr:'',
           desc:t.nome||'',
           valor:t.valor||0,
           pago:false,
-          who:'dudu'
+          who:'dudu',
+          templateKey:t._key
         });
-      });
-    }
+      }
+    });
   },{onlyOnce:true});
 }
 
@@ -688,19 +735,22 @@ window.addFixaTemplate=function(){
   const nome=document.getElementById('new-fixa-nome').value.trim();
   const val=parseFloat(document.getElementById('new-fixa-val').value)||0;
   const dia=parseInt(document.getElementById('new-fixa-dia').value)||1;
-  if(!nome||val<=0){alert('Preencha nome e valor.');return;}
+  const valorIndefinido=document.getElementById('new-fixa-indefinido')?.checked||false;
+  if(!nome){alert('Preencha o nome.');return;}
+  if(!valorIndefinido && val<=0){alert('Preencha o valor ou marque como Indefinido.');return;}
 
   // Salva no template global
-  push(ref(db,'fixasTemplate'),{nome,valor:val,dia});
+  push(ref(db,'fixasTemplate'),{nome,valor:valorIndefinido?0:val,dia,valorIndefinido:valorIndefinido||false});
 
   // Adiciona IMEDIATAMENTE no mês atual também
   const mesAtual=currentMonth.split('-')[1];
   push(ref(db,`meses/${currentMonth}/fixas`),{
     data:String(dia).padStart(2,'0')+'/'+mesAtual,
-    desc:nome,
-    valor:val,
+    desc:nome+(valorIndefinido?' (valor a definir)':''),
+    valor:valorIndefinido?0:val,
     pago:false,
-    who:'dudu'
+    who:'dudu',
+    valorIndefinido:valorIndefinido||false
   });
 
   document.getElementById('new-fixa-nome').value='';
