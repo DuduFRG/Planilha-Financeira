@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Planilha Financeira — Dudu & Beli</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -20,7 +20,8 @@
     --cat-investimentos:#06b6d4;--cat-indefinido:#9ca3af;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;min-height:100vh;}
+  html{overflow-x:hidden;max-width:100vw;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;min-height:100vh;overflow-x:hidden;max-width:100vw;-webkit-overflow-scrolling:touch;}
 
   /* SYNC */
   #sync-badge{position:fixed;bottom:16px;right:16px;z-index:999;font-size:11px;font-weight:600;padding:6px 12px;border-radius:20px;display:flex;align-items:center;gap:6px;box-shadow:0 2px 12px #00000044;}
@@ -30,7 +31,7 @@
   .dot-pulse{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.2s infinite;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-  header{background:linear-gradient(135deg,#1a1f30,#0d0f14);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  header{background:linear-gradient(135deg,#1a1f30,#0d0f14);border-bottom:1px solid var(--border);padding:16px 32px;padding-left:max(32px,env(safe-area-inset-left));padding-right:max(32px,env(safe-area-inset-right));display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
   header h1{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.5px;}
   header h1 span{color:var(--green);}
   .month-selector{display:flex;align-items:center;gap:10px;}
@@ -53,9 +54,9 @@
   .summary-card .sub{font-size:11px;color:var(--muted);}
   .v-green{color:var(--green);}.v-red{color:var(--red);}.v-yellow{color:var(--yellow);}
 
-  .action-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .action-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 
-  .wrapper{display:grid;grid-template-columns:1fr 1fr 300px;gap:0;background:var(--border);}
+  .wrapper{display:grid;grid-template-columns:1fr 1fr 300px;gap:0;background:var(--border);max-width:100%;overflow-x:hidden;}
   .col{display:flex;flex-direction:column;gap:1px;background:var(--border);}
 
   /* SIDEBAR */
@@ -183,7 +184,36 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   @media(max-width:1100px){.wrapper{grid-template-columns:1fr 1fr;}.sidebar{grid-column:1/3;border-left:none;border-top:1px solid var(--border);}}
-  @media(max-width:700px){.summary-bar{grid-template-columns:1fr 1fr;}.summary-card{padding:14px 16px;}.summary-card .value{font-size:20px;}.wrapper{grid-template-columns:1fr;}.sidebar{grid-column:1;}.action-bar,.header{padding:12px 16px;}}
+  @media(max-width:700px){
+    .summary-bar{grid-template-columns:1fr 1fr;}
+    .summary-card{padding:12px 14px;}
+    .summary-card .value{font-size:18px;}
+    .summary-card .label{font-size:9px;}
+    .wrapper{grid-template-columns:1fr;}
+    .sidebar{grid-column:1;}
+    .action-bar{padding:10px 14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));gap:8px;flex-wrap:wrap;}
+    .action-bar .btn,.action-bar .btn-gasto,.action-bar .btn{font-size:12px;padding:8px 12px;}
+    header{padding:12px 14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));}
+    header h1{font-size:15px;}
+    .month-selector select{font-size:12px;padding:6px 10px;}
+    .panel{padding:14px 12px;}
+    table{font-size:11px;}
+    th{font-size:8px;}
+    td{padding:5px 4px;}
+    td .desc{max-width:100px;}
+    .pago-toggle{font-size:10px;padding:2px 6px;}
+    .modal{padding:20px 16px;}
+    #sync-badge{bottom:10px;right:10px;font-size:10px;padding:4px 10px;}
+    .wrapper,.col{gap:0;}
+    .col > .panel{border-bottom:1px solid var(--border);}
+  }
+  @media(max-width:430px){
+    /* iPhone 15 Pro specific — 393px wide */
+    .summary-bar{grid-template-columns:1fr 1fr;}
+    .summary-card .value{font-size:16px;}
+    .btn-gasto{font-size:11px;}
+    td .desc{max-width:80px;}
+  }
 </style>
 </head>
 <body>
@@ -444,6 +474,20 @@ const CAT_COLORS_RAW = {
   lazer:'#8b5cf6', transporte:'#10b981', casa:'#f59e0b', investimentos:'#06b6d4'
 };
 
+
+// ── SORT BY DATE ──
+function sortByDate(arr){
+  return [...arr].sort((a,b)=>{
+    // dates like "05/06" or "10/07" — parse as day/month
+    const parse = s => {
+      if(!s) return 0;
+      const parts = s.split('/');
+      if(parts.length===2){ return parseInt(parts[1])*100 + parseInt(parts[0]); }
+      return 0;
+    };
+    return parse(a.data) - parse(b.data);
+  });
+}
 function brl(v){ return 'R$ '+parseFloat(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function sum(arr){ return arr.reduce((a,i)=>a+(parseFloat(i.valor)||0),0); }
 function showToast(msg,color='#22c55e'){ const t=document.getElementById('toast'); t.textContent=msg; t.style.background=color; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
@@ -502,7 +546,7 @@ function drawPizza(){
 function renderFixas(){
   const tb=document.getElementById('tbody-fixas'); if(!tb) return;
   tb.innerHTML='';
-  localData.fixas.forEach(item=>{
+  sortByDate(localData.fixas).forEach(item=>{
     const tr=document.createElement('tr');
     const pago=item.pago===true;
     const who=item.who?`<span class="badge-who ${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>`:'';
@@ -560,7 +604,7 @@ window.toggleDizimo=function(key,current){
 function renderTable(tbodyId, arr, type){
   const tb=document.getElementById(tbodyId); if(!tb) return;
   tb.innerHTML='';
-  arr.forEach(item=>{
+  sortByDate(arr).forEach(item=>{
     const tr=document.createElement('tr');
     const who=item.who?`<span class="badge-who ${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>`:'';
     const actions=`<div class="action-btns"><button class="icon-btn" onclick="window.editItem('${type}','${item._key}')">✏️</button><button class="icon-btn del" onclick="window.deleteItem('${type}','${item._key}')">×</button></div>`;
