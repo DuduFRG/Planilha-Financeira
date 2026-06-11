@@ -689,17 +689,36 @@ window.addFixaTemplate=function(){
   const val=parseFloat(document.getElementById('new-fixa-val').value)||0;
   const dia=parseInt(document.getElementById('new-fixa-dia').value)||1;
   if(!nome||val<=0){alert('Preencha nome e valor.');return;}
+
+  // Salva no template global
   push(ref(db,'fixasTemplate'),{nome,valor:val,dia});
+
+  // Adiciona IMEDIATAMENTE no mês atual também
+  const mesAtual=currentMonth.split('-')[1];
+  push(ref(db,`meses/${currentMonth}/fixas`),{
+    data:String(dia).padStart(2,'0')+'/'+mesAtual,
+    desc:nome,
+    valor:val,
+    pago:false,
+    who:'dudu'
+  });
+
   document.getElementById('new-fixa-nome').value='';
   document.getElementById('new-fixa-val').value='';
   document.getElementById('new-fixa-dia').value='';
-  showToast('Conta fixa adicionada!');
+  showToast('✅ Conta adicionada!');
   setTimeout(renderFixasTemplateList,400);
 };
 
 window.deleteFixaTemplate=function(key){
-  if(!confirm('Remover esta conta fixa do template?')) return;
+  if(!confirm('Remover esta conta fixa do template?\n\nIsso também vai remover do mês atual se ainda estiver como Pendente.')) return;
+  const t=fixasTemplate.find(i=>i._key===key);
   remove(ref(db,`fixasTemplate/${key}`));
+  // Remove também do mês atual se pendente e com mesmo nome
+  if(t){
+    const match=localData.fixas.find(f=>f.desc===t.nome && f.pago===false);
+    if(match) remove(ref(db,`meses/${currentMonth}/fixas/${match._key}`));
+  }
   setTimeout(renderFixasTemplateList,400);
 };
 
