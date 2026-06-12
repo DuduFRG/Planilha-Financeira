@@ -116,6 +116,7 @@
   .badge-who{font-size:9px;padding:2px 5px;border-radius:4px;font-weight:600;margin-left:2px;}
   .badge-who.dudu{background:#60a5fa18;color:var(--blue);}
   .badge-who.beli{background:#f472b618;color:#f472b6;}
+  .desktop-hide-cards{display:none;}
   .action-btns{display:flex;gap:3px;opacity:0;transition:opacity .15s;}
   tr:hover .action-btns{opacity:1;}
   .icon-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 5px;border-radius:4px;line-height:1;transition:color .1s,background .1s;}
@@ -183,36 +184,142 @@
   .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  @media(max-width:1100px){.wrapper{grid-template-columns:1fr 1fr;}.sidebar{grid-column:1/3;border-left:none;border-top:1px solid var(--border);}}
-  @media(max-width:700px){
-    .summary-bar{grid-template-columns:1fr 1fr;}
-    .summary-card{padding:12px 14px;}
-    .summary-card .value{font-size:18px;}
-    .summary-card .label{font-size:9px;}
-    .wrapper{grid-template-columns:1fr;}
-    .sidebar{grid-column:1;}
-    .action-bar{padding:10px 14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));gap:8px;flex-wrap:wrap;}
-    .action-bar .btn,.action-bar .btn-gasto,.action-bar .btn{font-size:12px;padding:8px 12px;}
-    header{padding:12px 14px;padding-left:max(14px,env(safe-area-inset-left));padding-right:max(14px,env(safe-area-inset-right));}
-    header h1{font-size:15px;}
-    .month-selector select{font-size:12px;padding:6px 10px;}
-    .panel{padding:14px 12px;}
-    table{font-size:11px;}
-    th{font-size:8px;}
-    td{padding:5px 4px;}
-    td .desc{max-width:100px;}
-    .pago-toggle{font-size:10px;padding:2px 6px;}
-    .modal{padding:20px 16px;}
-    #sync-badge{bottom:10px;right:10px;font-size:10px;padding:4px 10px;}
-    .wrapper,.col{gap:0;}
-    .col > .panel{border-bottom:1px solid var(--border);}
+
+  /* ── TABLET ── */
+  @media(max-width:1100px){
+    .wrapper{grid-template-columns:1fr 1fr;}
+    .sidebar{grid-column:1/3;border-left:none;border-top:1px solid var(--border);}
   }
+
+  /* ══════════════════════════════════════════
+     MOBILE — tudo ≤ 768px (iPhone, Android)
+  ══════════════════════════════════════════ */
+  @media(max-width:768px){
+
+    /* ── BASE: sem scroll horizontal de jeito nenhum ── */
+    .desktop-hide-cards{display:block !important;}
+    .mobile-hide-table{display:none !important;}
+    html{ overflow-x:hidden; width:100%; }
+    body{ overflow-x:hidden; width:100%; min-width:0; }
+    *, *::before, *::after{ min-width:0; }
+
+    /* ── HEADER: Dynamic Island + notch ── */
+    header{
+      padding-top: env(safe-area-inset-top, 16px);
+      padding-top: max(env(safe-area-inset-top), 16px);
+      padding-left: max(env(safe-area-inset-left), 16px);
+      padding-right: max(env(safe-area-inset-right), 16px);
+      padding-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    header h1{ font-size: 15px; }
+    .month-selector select{ font-size: 12px; padding: 6px 10px; }
+
+    /* ── SUMMARY: 2x2 grid limpo ── */
+    .summary-bar{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-card{ padding: 14px 16px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .summary-card:nth-child(2){ border-right: none; }
+    .summary-card:nth-child(3){ border-bottom: none; }
+    .saldo-card{ grid-column: 1 / 3; border-right: none; border-bottom: none; }
+    .summary-card .value{ font-size: 20px; }
+    .summary-card .label{ font-size: 9px; }
+    .summary-card .sub{ font-size: 10px; }
+
+    /* ── ACTION BAR: 2 botões lado a lado, extrato embaixo ── */
+    .action-bar{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px max(env(safe-area-inset-left), 14px);
+      padding-right: max(env(safe-area-inset-right), 14px);
+    }
+    .action-bar .btn{ justify-content: center; padding: 11px 8px; font-size: 13px; width: 100%; }
+    .action-bar .btn-gasto{ justify-content: center; padding: 11px 8px; font-size: 13px; width: 100%; }
+    .extrato-btn{ grid-column: 1 / 3; justify-content: center; }
+
+    /* ── WRAPPER: coluna única ── */
+    .wrapper{ display: flex; flex-direction: column; width: 100%; background: var(--bg); }
+    .col{ width: 100%; background: transparent; }
+    .sidebar{ border-left: none; border-top: 2px solid var(--border); padding: 16px max(env(safe-area-inset-left), 14px); }
+
+    /* ── PANEL ── */
+    .panel{
+      padding: 16px max(env(safe-area-inset-left), 14px);
+      padding-right: max(env(safe-area-inset-right), 14px);
+      border-bottom: 1px solid var(--border);
+      width: 100%;
+    }
+    .panel-title-text{ font-size: 11px; }
+
+    /* ── TABLES: mostrar como cards no mobile ── */
+    /* Esconde a table normal */
+    .mobile-hide-table{ display: none !important; }
+
+    /* Cards de itens */
+    .item-card{
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 11px 13px;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .item-card:last-child{ margin-bottom: 0; }
+    .item-card-row{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .item-card-name{ font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+    .item-card-sub{ font-size: 11px; color: var(--muted); }
+    .item-card-val{ font-size: 14px; font-weight: 700; white-space: nowrap; }
+    .item-card-meta{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .item-card-actions{ display: flex; gap: 4px; }
+
+    /* Pago toggle */
+    .pago-toggle{ font-size: 11px; padding: 4px 10px; }
+
+    /* ── MODAL: bottom sheet ── */
+    .modal-overlay{ align-items: flex-end; }
+    .modal{
+      width: 100%;
+      max-width: 100%;
+      border-radius: 20px 20px 0 0;
+      padding: 24px max(env(safe-area-inset-left), 20px);
+      padding-right: max(env(safe-area-inset-right), 20px);
+      padding-bottom: max(env(safe-area-inset-bottom), 28px);
+      max-height: 88vh;
+    }
+
+    /* ── SYNC / TOAST ── */
+    #sync-badge{
+      bottom: max(env(safe-area-inset-bottom), 12px);
+      right: max(env(safe-area-inset-right), 12px);
+      font-size: 10px; padding: 5px 10px;
+    }
+    #toast{
+      bottom: max(calc(env(safe-area-inset-bottom) + 60px), 70px);
+      max-width: calc(100% - 40px);
+      text-align: center;
+    }
+
+    /* ── PANEL TOTAL ── */
+    .panel-total{ font-size: 13px; }
+
+    /* ── Casa/Invest grid → coluna no mobile ── */
+    .casa-invest-grid{ display: flex !important; flex-direction: column !important; }
+  }
+
+  /* ── iPhone 15 Pro especificamente (393px lógicos) ── */
   @media(max-width:430px){
-    /* iPhone 15 Pro specific — 393px wide */
-    .summary-bar{grid-template-columns:1fr 1fr;}
-    .summary-card .value{font-size:16px;}
-    .btn-gasto{font-size:11px;}
-    td .desc{max-width:80px;}
+    /* Dynamic Island do iPhone 15 Pro = ~59px do topo */
+    header{ padding-top: max(env(safe-area-inset-top), 59px); }
+    .summary-card .value{ font-size: 18px; }
   }
 </style>
 </head>
@@ -241,14 +348,14 @@
 <div class="summary-bar">
   <div class="summary-card"><div class="label">💼 Entradas</div><div class="value v-green" id="s-entradas">R$ 0,00</div><div class="sub" id="s-entradas-sub">0 lançamentos</div></div>
   <div class="summary-card"><div class="label">📤 Total Gastos</div><div class="value v-red" id="s-gastos">R$ 0,00</div><div class="sub">em todas as categorias</div></div>
-  <div class="summary-card"><div class="label">⚖️ Saldo</div><div class="value" id="s-saldo">R$ 0,00</div><div class="sub" id="s-saldo-pct">—</div></div>
+  <div class="summary-card saldo-card"><div class="label">⚖️ Saldo</div><div class="value" id="s-saldo">R$ 0,00</div><div class="sub" id="s-saldo-pct">—</div></div>
   
 </div>
 
 <div class="action-bar">
   <button class="btn" onclick="openModal('entrada')">+ Nova Entrada</button>
   <button class="btn-gasto" onclick="openModal('gasto')">+ Adicionar Gasto</button>
-  <button class="btn purple" onclick="openExtratoModal()">📄 Importar Extrato</button>
+  <button class="btn purple extrato-btn" onclick="openExtratoModal()">📄 Importar Extrato</button>
 </div>
 
 <div class="wrapper">
@@ -258,10 +365,11 @@
     <!-- ENTRADAS -->
     <div class="panel">
       <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--green)"></span>Entradas</div></div>
-      <div class="table-wrap" style="max-height:200px;">
+      <div class="table-wrap mobile-hide-table" style="max-height:200px;">
         <table><thead><tr><th>Data</th><th>Origem</th><th>Serviço</th><th>Díz.</th><th style="text-align:right">Valor</th><th></th></tr></thead>
         <tbody id="tbody-entradas"></tbody></table>
       </div>
+      <div id="cards-entradas" class="desktop-hide-cards"></div>
       <div class="panel-total"><span>Total Entradas</span><span class="v-green" id="total-entradas">R$ 0,00</span></div>
     </div>
 
@@ -271,20 +379,22 @@
         <div class="panel-title-text"><span class="dot" style="background:var(--blue)"></span>Contas Obrigatórias</div>
         <button class="btn-sm" onclick="openGerenciarFixas()">⚙️ Gerenciar</button>
       </div>
-      <div class="table-wrap" style="max-height:260px;">
+      <div class="table-wrap mobile-hide-table" style="max-height:260px;">
         <table><thead><tr><th>Venc.</th><th>Descrição</th><th style="text-align:right">Valor</th><th>Status</th><th></th></tr></thead>
         <tbody id="tbody-fixas"></tbody></table>
       </div>
+      <div id="cards-fixas" class="desktop-hide-cards"></div>
       <div class="panel-total"><span>Total Fixas</span><span class="v-red" id="total-fixas">R$ 0,00</span></div>
     </div>
 
     <!-- IMPREVISTOS -->
     <div class="panel">
       <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--red)"></span>Imprevistos</div></div>
-      <div class="table-wrap" style="max-height:180px;">
+      <div class="table-wrap mobile-hide-table" style="max-height:180px;">
         <table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead>
         <tbody id="tbody-imprevistos"></tbody></table>
       </div>
+      <div id="cards-imprevistos" class="desktop-hide-cards"></div>
       <div class="panel-total"><span>Total Imprevistos</span><span class="v-red" id="total-imprevistos">R$ 0,00</span></div>
     </div>
   </div>
@@ -293,28 +403,28 @@
   <div class="col">
     <div class="panel">
       <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--cat-alimentacao)"></span>Alimentação</div></div>
-      <div class="table-wrap" style="max-height:200px;"><table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-alimentacao"></tbody></table></div>
+      <div class="table-wrap mobile-hide-table" style="max-height:200px;"><table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-alimentacao"></tbody></table></div><div id="cards-alimentacao" class="desktop-hide-cards"></div>
       <div class="panel-total"><span>Total Alimentação</span><span style="color:var(--cat-alimentacao)" id="total-alimentacao">R$ 0,00</span></div>
     </div>
     <div class="panel">
       <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--cat-lazer)"></span>Lazer</div></div>
-      <div class="table-wrap" style="max-height:160px;"><table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-lazer"></tbody></table></div>
+      <div class="table-wrap mobile-hide-table" style="max-height:160px;"><table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-lazer"></tbody></table></div><div id="cards-lazer" class="desktop-hide-cards"></div>
       <div class="panel-total"><span>Total Lazer</span><span style="color:var(--cat-lazer)" id="total-lazer">R$ 0,00</span></div>
     </div>
     <div class="panel">
       <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--cat-transporte)"></span>Transporte</div></div>
-      <div class="table-wrap" style="max-height:120px;"><table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-transporte"></tbody></table></div>
+      <div class="table-wrap mobile-hide-table" style="max-height:120px;"><table><thead><tr><th>Data</th><th>Descrição</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-transporte"></tbody></table></div><div id="cards-transporte" class="desktop-hide-cards"></div>
       <div class="panel-total"><span>Total Transporte</span><span style="color:var(--cat-transporte)" id="total-transporte">R$ 0,00</span></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);">
+    <div class="casa-invest-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);">
       <div class="panel">
         <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--cat-casa)"></span>Casa</div></div>
-        <div class="table-wrap" style="max-height:100px;"><table><thead><tr><th>Data</th><th>Desc.</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-casa"></tbody></table></div>
+        <div class="table-wrap mobile-hide-table" style="max-height:100px;"><table><thead><tr><th>Data</th><th>Desc.</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-casa"></tbody></table></div><div id="cards-casa" class="desktop-hide-cards"></div>
         <div class="panel-total"><span>Casa</span><span style="color:var(--cat-casa)" id="total-casa">R$ 0,00</span></div>
       </div>
       <div class="panel">
         <div class="panel-header"><div class="panel-title-text"><span class="dot" style="background:var(--cat-investimentos)"></span>Invest.</div></div>
-        <div class="table-wrap" style="max-height:100px;"><table><thead><tr><th>Data</th><th>Desc.</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-investimentos"></tbody></table></div>
+        <div class="table-wrap mobile-hide-table" style="max-height:100px;"><table><thead><tr><th>Data</th><th>Desc.</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody id="tbody-investimentos"></tbody></table></div><div id="cards-investimentos" class="desktop-hide-cards"></div>
         <div class="panel-total"><span>Invest.</span><span style="color:var(--cat-investimentos)" id="total-investimentos">R$ 0,00</span></div>
       </div>
     </div>
@@ -475,6 +585,80 @@ const CAT_COLORS_RAW = {
 };
 
 
+
+// ── MOBILE CARD RENDERER ──
+function isMobile(){ return window.innerWidth <= 768; }
+
+function createCardList(arr, type, containerId){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  container.innerHTML = '';
+  if(!arr.length){
+    container.innerHTML = '<p style="color:var(--muted);font-size:12px;padding:8px 0;">Nenhum item ainda.</p>';
+    return;
+  }
+  sortByDate(arr).forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    const who = item.who ? `<span class="badge-who ${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+
+    if(type === 'entrada'){
+      const dv = item.dizimo===true;
+      const dLabel = dv ? 'SIM' : 'NÃO';
+      const dStyle = dv ? 'background:#22c55e18;color:#22c55e;' : 'background:#ef444418;color:#f87171;';
+      const dBtn = `<button onclick="window.toggleDizimo('${item._key}',${dv})" style="border:none;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;${dStyle}">Díz: ${dLabel}</button>`;
+      card.innerHTML = `
+        <div class="item-card-row">
+          <div>
+            <div class="item-card-name">${item.origem||'—'}</div>
+            <div class="item-card-sub">${item.servico||''} · ${item.data||'—'}</div>
+          </div>
+          <div class="item-card-val v-green">+${brl(item.valor)}</div>
+        </div>
+        <div class="item-card-row">
+          <div class="item-card-meta">${dBtn}${who}</div>
+          <div class="item-card-actions">
+            <button class="icon-btn" onclick="window.editItem('entrada','${item._key}')">✏️</button>
+            <button class="icon-btn del" onclick="window.deleteItem('entrada','${item._key}')">×</button>
+          </div>
+        </div>`;
+    } else if(type === 'fixa'){
+      const pago = item.pago===true;
+      const valDisplay = item.valorIndefinido&&!item.pago ? '<span style="color:var(--muted)">? (a definir)</span>' : `<span class="item-card-val v-red">${brl(item.valor)}</span>`;
+      card.innerHTML = `
+        <div class="item-card-row">
+          <div>
+            <div class="item-card-name">${item.desc||'—'}</div>
+            <div class="item-card-sub">Venc: ${item.data||'—'} ${who}</div>
+          </div>
+          ${valDisplay}
+        </div>
+        <div class="item-card-row">
+          <button class="pago-toggle ${pago?'pago':'pendente'}" onclick="window.togglePago('${item._key}',${pago})">${pago?'✓ Pago':'⏳ Pendente'}</button>
+          <div class="item-card-actions">
+            <button class="icon-btn" onclick="window.editItem('fixa','${item._key}')">✏️</button>
+            <button class="icon-btn del" onclick="window.deleteItem('fixa','${item._key}')">×</button>
+          </div>
+        </div>`;
+    } else {
+      card.innerHTML = `
+        <div class="item-card-row">
+          <div>
+            <div class="item-card-name">${item.desc||'—'}</div>
+            <div class="item-card-sub">${item.data||'—'} ${who}</div>
+          </div>
+          <div class="item-card-val v-red">${brl(item.valor)}</div>
+        </div>
+        <div class="item-card-row" style="justify-content:flex-end;">
+          <div class="item-card-actions">
+            <button class="icon-btn" onclick="window.editItem('${type}','${item._key}')">✏️</button>
+            <button class="icon-btn del" onclick="window.deleteItem('${type}','${item._key}')">×</button>
+          </div>
+        </div>`;
+    }
+    container.appendChild(card);
+  });
+}
 // ── SORT BY DATE ──
 function sortByDate(arr){
   return [...arr].sort((a,b)=>{
@@ -667,6 +851,17 @@ function renderAll(){
   renderTable('tbody-casa', localData.casa, 'casa');
   renderTable('tbody-investimentos', localData.investimentos, 'investimento');
   renderIndefinidos();
+  // Mobile cards
+  if(isMobile()){
+    createCardList(localData.entradas,'entrada','cards-entradas');
+    createCardList(localData.fixas,'fixa','cards-fixas');
+    createCardList(localData.imprevistos,'imprevisto','cards-imprevistos');
+    createCardList(localData.alimentacao,'alimentacao','cards-alimentacao');
+    createCardList(localData.lazer,'lazer','cards-lazer');
+    createCardList(localData.transporte,'transporte','cards-transporte');
+    createCardList(localData.casa,'casa','cards-casa');
+    createCardList(localData.investimentos,'investimento','cards-investimentos');
+  }
 
   const tE=sum(localData.entradas), tF=sum(localData.fixas.filter(f=>f.pago===true)), tI=sum(localData.imprevistos),
         tA=sum(localData.alimentacao), tL=sum(localData.lazer), tT=sum(localData.transporte),
@@ -983,6 +1178,8 @@ setSyncStatus('syncing','Conectando...');
 subscribeFixasTemplate();
 subscribeMonth(currentMonth);
 setView('bars');
+// Re-render on resize for responsive switch
+window.addEventListener('resize', ()=>{ renderAll(); });
 </script>
 </body>
 </html>
