@@ -630,12 +630,12 @@ function createCardList(arr, type, containerId){
         <div class="item-card-row">
           <div>
             <div class="item-card-name">${item.origem||'—'}</div>
-            <div class="item-card-sub">${item.servico||''} · ${item.data||'—'}${item.pagamento?' · '+pagamentoBadge(item):''}</div>
+            <div class="item-card-sub">${item.servico||''} · ${item.data||'—'}</div>
           </div>
           <div class="item-card-val v-green">+${brl(item.valor)}</div>
         </div>
         <div class="item-card-row">
-          <div class="item-card-meta">${dBtn}${who}</div>
+          <div class="item-card-meta">${dBtn}${who}${pagamentoBadge(item)}</div>
           <div class="item-card-actions">
             <button class="icon-btn" onclick="window.editItem('entrada','${item._key}')">✏️</button>
             <button class="icon-btn del" onclick="window.deleteItem('entrada','${item._key}')">×</button>
@@ -648,7 +648,7 @@ function createCardList(arr, type, containerId){
         <div class="item-card-row">
           <div>
             <div class="item-card-name">${item.desc||'—'}</div>
-            <div class="item-card-sub">Venc: ${item.data||'—'}${item.pagamento?pagamentoBadge(item):''} ${who}</div>
+            <div class="item-card-sub">Venc: ${item.data||'—'} ${who}${pagamentoBadge(item)}</div>
           </div>
           ${valDisplay}
         </div>
@@ -664,7 +664,7 @@ function createCardList(arr, type, containerId){
         <div class="item-card-row">
           <div>
             <div class="item-card-name">${item.desc||'—'}</div>
-            <div class="item-card-sub">${item.data||'—'}${item.pagamento?pagamentoBadge(item):''} ${who}</div>
+            <div class="item-card-sub">${item.data||'—'} ${who}${pagamentoBadge(item)}</div>
           </div>
           <div class="item-card-val v-red">${brl(item.valor)}</div>
         </div>
@@ -723,7 +723,7 @@ function readDateInput(id){
 const PAGAMENTO_OPTIONS = [
   {value:'debito',label:'💳 Débito',color:'#60a5fa'},
   {value:'credito',label:'💰 Crédito',color:'#f97316'},
-  {value:'pix',label:'⚡ Pix',color:'#22c55e'},
+  {value:'pix',label:'⚡ PIX',color:'#22c55e'},
   {value:'dinheiro',label:'💵 Dinheiro',color:'#a78bfa'},
 ];
 function pagamentoBadge(item){
@@ -851,7 +851,7 @@ function renderFixas(){
     const who=item.who?`<span class="badge-who ${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>`:'';
     tr.innerHTML=`
       <td class="date-col">${item.data||'—'}</td>
-      <td><div class="desc">${item.desc||''}${pagamentoBadge(item)}</div>${who}</td>
+      <td><div class="desc">${item.desc||''}</div>${who}${pagamentoBadge(item)}</td>
       <td class="val v-red">${item.valorIndefinido&&!item.pago?'<span style="color:var(--muted);font-size:12px;">? (a definir)</span>':brl(item.valor)}</td>
       <td><button class="pago-toggle ${pago?'pago':'pendente'}" onclick="window.togglePago('${item._key}',${pago})">${pago?'✓ Pago':'⏳ Pendente'}</button></td>
       <td><div class="action-btns">
@@ -912,9 +912,9 @@ function renderTable(tbodyId, arr, type){
       const dizimoLabel=dizimoVal?'SIM':'NÃO';
       const dizimoStyle=dizimoVal?'background:#22c55e18;color:#22c55e;':'background:#ef444418;color:#f87171;';
       const dizimoBadge=`<button onclick="window.toggleDizimo('${item._key}',${dizimoVal})" style="border:none;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;cursor:pointer;${dizimoStyle}">${dizimoLabel}</button>`;
-      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.origem||''}</div></td><td><div class="desc">${item.servico||''}${pagamentoBadge(item)}</div></td><td>${dizimoBadge} ${who}</td><td class="val v-green">${brl(item.valor)}</td><td>${actions}</td>`;
+      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.origem||''}</div></td><td><div class="desc">${item.servico||''}</div></td><td>${dizimoBadge} ${who}${pagamentoBadge(item)}</td><td class="val v-green">${brl(item.valor)}</td><td>${actions}</td>`;
     } else {
-      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.desc||''}${pagamentoBadge(item)}</div>${who}</td><td class="val v-red">${brl(item.valor)}</td><td>${actions}</td>`;
+      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.desc||''}</div>${who}${pagamentoBadge(item)}</td><td class="val v-red">${brl(item.valor)}</td><td>${actions}</td>`;
     }
     tb.appendChild(tr);
   });
