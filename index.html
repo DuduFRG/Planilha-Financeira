@@ -113,6 +113,7 @@
   td.date-col{color:var(--muted);font-size:11px;white-space:nowrap;width:40px;}
   td .desc{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .badge-dizimo{font-size:9px;padding:2px 5px;border-radius:4px;background:#22c55e18;color:var(--green);font-weight:600;}
+  .badge-pagamento{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;margin-left:2px;white-space:nowrap;}
   .badge-who{font-size:9px;padding:2px 5px;border-radius:4px;font-weight:600;margin-left:2px;}
   .badge-who.dudu{background:#60a5fa18;color:var(--blue);}
   .badge-who.beli{background:#f472b618;color:#f472b6;}
@@ -155,6 +156,17 @@
   .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:420px;max-width:96vw;box-shadow:0 20px 60px #00000066;max-height:90vh;overflow-y:auto;}
   .modal h2{font-family:'Space Grotesk',sans-serif;font-size:16px;margin-bottom:16px;font-weight:700;}
   .modal label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;margin-top:11px;font-weight:500;}
+
+  /* Native date input styling */
+  input[type="date"]{
+    color-scheme: dark;
+    cursor: pointer;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    filter: invert(0.8);
+    cursor: pointer;
+    padding: 4px;
+  }
   .modal input,.modal select,.modal textarea{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;transition:border-color .15s;}
   .modal input:focus,.modal select:focus{outline:none;border-color:var(--green);}
   .modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:flex-end;}
@@ -446,6 +458,7 @@
       <div class="view-toggle">
         <button class="view-btn active" id="btn-bars" onclick="setView('bars')">Barras</button>
         <button class="view-btn" id="btn-pizza" onclick="setView('pizza')">Pizza</button>
+        <button class="view-btn" id="btn-pagamento" onclick="setView('pagamento')">Pagamento</button>
       </div>
     </div>
 
@@ -456,6 +469,12 @@
     <div id="pizza-container">
       <canvas id="pizza-canvas" width="200" height="200"></canvas>
       <div class="pizza-legend" id="pizza-legend"></div>
+    </div>
+
+    <!-- PAGAMENTO BREAKDOWN -->
+    <div id="pagamento-container" style="display:none;flex-direction:column;align-items:center;gap:12px;">
+      <canvas id="pagamento-canvas" width="200" height="200"></canvas>
+      <div class="pizza-legend" id="pagamento-legend"></div>
     </div>
 
     <div class="balance-block">
@@ -611,7 +630,7 @@ function createCardList(arr, type, containerId){
         <div class="item-card-row">
           <div>
             <div class="item-card-name">${item.origem||'—'}</div>
-            <div class="item-card-sub">${item.servico||''} · ${item.data||'—'}</div>
+            <div class="item-card-sub">${item.servico||''} · ${item.data||'—'}${item.pagamento?' · '+pagamentoBadge(item):''}</div>
           </div>
           <div class="item-card-val v-green">+${brl(item.valor)}</div>
         </div>
@@ -629,7 +648,7 @@ function createCardList(arr, type, containerId){
         <div class="item-card-row">
           <div>
             <div class="item-card-name">${item.desc||'—'}</div>
-            <div class="item-card-sub">Venc: ${item.data||'—'} ${who}</div>
+            <div class="item-card-sub">Venc: ${item.data||'—'}${item.pagamento?pagamentoBadge(item):''} ${who}</div>
           </div>
           ${valDisplay}
         </div>
@@ -645,7 +664,7 @@ function createCardList(arr, type, containerId){
         <div class="item-card-row">
           <div>
             <div class="item-card-name">${item.desc||'—'}</div>
-            <div class="item-card-sub">${item.data||'—'} ${who}</div>
+            <div class="item-card-sub">${item.data||'—'}${item.pagamento?pagamentoBadge(item):''} ${who}</div>
           </div>
           <div class="item-card-val v-red">${brl(item.valor)}</div>
         </div>
@@ -672,6 +691,51 @@ function sortByDate(arr){
     return parse(a.data) - parse(b.data);
   });
 }
+
+// ── DATE PICKER HELPERS ──
+// Stored format is "DD/MM". Native <input type="date"> needs "YYYY-MM-DD".
+function ddmmToISO(ddmm){
+  if(!ddmm) return '';
+  const parts = ddmm.split('/');
+  if(parts.length!==2) return '';
+  const [dd,mm] = parts;
+  const year = currentMonth.split('-')[0]; // use current month's year
+  return `${year}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+}
+function isoToDDMM(iso){
+  if(!iso) return '';
+  const parts = iso.split('-');
+  if(parts.length!==3) return '';
+  const [yyyy,mm,dd] = parts;
+  return `${dd}/${mm}`;
+}
+// Renders a native date input (opens calendar on click) pre-filled from DD/MM
+function dateInputHtml(id, ddmmValue){
+  const iso = ddmmToISO(ddmmValue);
+  return `<input type="date" id="${id}" value="${iso}" data-ddmm="${ddmmValue||''}">`;
+}
+// Reads the value back as DD/MM
+function readDateInput(id){
+  const el = document.getElementById(id);
+  if(!el) return '';
+  return isoToDDMM(el.value);
+}
+const PAGAMENTO_OPTIONS = [
+  {value:'debito',label:'💳 Débito',color:'#60a5fa'},
+  {value:'credito',label:'💰 Crédito',color:'#f97316'},
+  {value:'pix',label:'⚡ Pix',color:'#22c55e'},
+  {value:'dinheiro',label:'💵 Dinheiro',color:'#a78bfa'},
+];
+function pagamentoBadge(item){
+  if(!item.pagamento) return '';
+  const opt = PAGAMENTO_OPTIONS.find(p=>p.value===item.pagamento);
+  if(!opt) return '';
+  return `<span class="badge-pagamento" style="background:${opt.color}18;color:${opt.color};">${opt.label}</span>`;
+}
+function pagamentoSelectHtml(selected){
+  const opts = PAGAMENTO_OPTIONS.map(p=>`<option value="${p.value}" ${selected===p.value?'selected':''}>${p.label}</option>`).join('');
+  return `<option value="">— Não informado —</option>${opts}`;
+}
 function brl(v){ return 'R$ '+parseFloat(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
 function sum(arr){ return arr.reduce((a,i)=>a+(parseFloat(i.valor)||0),0); }
 function showToast(msg,color='#22c55e'){ const t=document.getElementById('toast'); t.textContent=msg; t.style.background=color; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
@@ -682,10 +746,61 @@ window.setView=function(v){
   currentView=v;
   document.getElementById('btn-bars').classList.toggle('active',v==='bars');
   document.getElementById('btn-pizza').classList.toggle('active',v==='pizza');
+  document.getElementById('btn-pagamento').classList.toggle('active',v==='pagamento');
   document.getElementById('bars-container').style.display=v==='bars'?'block':'none';
   document.getElementById('pizza-container').style.display=v==='pizza'?'flex':'none';
+  document.getElementById('pagamento-container').style.display=v==='pagamento'?'flex':'none';
   if(v==='pizza') drawPizza();
+  if(v==='pagamento') drawPagamentoChart();
 };
+
+// ── PAGAMENTO (Débito/Crédito/Pix/Dinheiro) CHART ──
+function drawPagamentoChart(){
+  const canvas=document.getElementById('pagamento-canvas');
+  const ctx=canvas.getContext('2d');
+  // Gather all gasto items across categories (excluding entradas)
+  const allGastos=[
+    ...localData.fixas.filter(f=>f.pago===true),
+    ...localData.imprevistos,
+    ...localData.alimentacao,
+    ...localData.lazer,
+    ...localData.transporte,
+    ...localData.casa,
+    ...localData.investimentos
+  ];
+  const grouped={};
+  PAGAMENTO_OPTIONS.forEach(p=>grouped[p.value]={label:p.label,color:p.color,val:0});
+  grouped['none']={label:'— Não informado —',color:'#6b7280',val:0};
+  allGastos.forEach(item=>{
+    const key=item.pagamento&&grouped[item.pagamento]?item.pagamento:'none';
+    grouped[key].val+=parseFloat(item.valor)||0;
+  });
+  const cats=Object.values(grouped).filter(c=>c.val>0);
+  const total=cats.reduce((a,c)=>a+c.val,0);
+  ctx.clearRect(0,0,200,200);
+  if(!total){
+    const leg=document.getElementById('pagamento-legend');
+    leg.innerHTML='<p style="font-size:11px;color:var(--muted);text-align:center;">Nenhum gasto com forma de pagamento definida ainda.</p>';
+    return;
+  }
+  let start=-Math.PI/2;
+  cats.forEach(c=>{
+    const slice=(c.val/total)*2*Math.PI;
+    ctx.beginPath(); ctx.moveTo(100,100);
+    ctx.arc(100,100,90,start,start+slice);
+    ctx.fillStyle=c.color; ctx.fill();
+    ctx.strokeStyle='#151820'; ctx.lineWidth=2; ctx.stroke();
+    start+=slice;
+  });
+  ctx.beginPath(); ctx.arc(100,100,40,0,2*Math.PI);
+  ctx.fillStyle='#151820'; ctx.fill();
+  const leg=document.getElementById('pagamento-legend');
+  leg.innerHTML=cats.map(c=>`
+    <div class="pizza-leg-item">
+      <div class="pizza-leg-left"><div class="pizza-leg-dot" style="background:${c.color}"></div>${c.label}</div>
+      <span style="color:var(--muted);font-size:11px;">${((c.val/total)*100).toFixed(0)}% · ${brl(c.val)}</span>
+    </div>`).join('');
+}
 
 // ── PIZZA CHART ──
 function drawPizza(){
@@ -736,7 +851,7 @@ function renderFixas(){
     const who=item.who?`<span class="badge-who ${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>`:'';
     tr.innerHTML=`
       <td class="date-col">${item.data||'—'}</td>
-      <td><div class="desc">${item.desc||''}</div>${who}</td>
+      <td><div class="desc">${item.desc||''}${pagamentoBadge(item)}</div>${who}</td>
       <td class="val v-red">${item.valorIndefinido&&!item.pago?'<span style="color:var(--muted);font-size:12px;">? (a definir)</span>':brl(item.valor)}</td>
       <td><button class="pago-toggle ${pago?'pago':'pendente'}" onclick="window.togglePago('${item._key}',${pago})">${pago?'✓ Pago':'⏳ Pendente'}</button></td>
       <td><div class="action-btns">
@@ -797,9 +912,9 @@ function renderTable(tbodyId, arr, type){
       const dizimoLabel=dizimoVal?'SIM':'NÃO';
       const dizimoStyle=dizimoVal?'background:#22c55e18;color:#22c55e;':'background:#ef444418;color:#f87171;';
       const dizimoBadge=`<button onclick="window.toggleDizimo('${item._key}',${dizimoVal})" style="border:none;border-radius:4px;padding:2px 7px;font-size:9px;font-weight:700;cursor:pointer;${dizimoStyle}">${dizimoLabel}</button>`;
-      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.origem||''}</div></td><td><div class="desc">${item.servico||''}</div></td><td>${dizimoBadge} ${who}</td><td class="val v-green">${brl(item.valor)}</td><td>${actions}</td>`;
+      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.origem||''}</div></td><td><div class="desc">${item.servico||''}${pagamentoBadge(item)}</div></td><td>${dizimoBadge} ${who}</td><td class="val v-green">${brl(item.valor)}</td><td>${actions}</td>`;
     } else {
-      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.desc||''}</div>${who}</td><td class="val v-red">${brl(item.valor)}</td><td>${actions}</td>`;
+      tr.innerHTML=`<td class="date-col">${item.data||'—'}</td><td><div class="desc">${item.desc||''}${pagamentoBadge(item)}</div>${who}</td><td class="val v-red">${brl(item.valor)}</td><td>${actions}</td>`;
     }
     tb.appendChild(tr);
   });
@@ -838,6 +953,7 @@ function renderSidebar(tA,tF,tI,tL,tT,tC,tIn,totalG){
     return `<div class="cat-bar-label"><div class="cat-name"><span>${c.icon}</span>${c.label}</div><div class="cat-right"><span class="cat-pct">${pct}%</span><span style="color:var(--muted);font-size:11px;">${brl(c.val)}</span></div></div><div class="cat-bar-wrap"><div class="cat-bar-fill" style="width:${p.toFixed(1)}%;background:${c.color}"></div></div>`;
   }).join('');
   if(currentView==='pizza') drawPizza();
+  if(currentView==='pagamento') drawPagamentoChart();
 }
 
 // ── RENDER ALL ──
@@ -1042,10 +1158,10 @@ window.editItem=function(type,key){
   const who=`<label>Quem registrou?</label><select id="f-who"><option value="dudu" ${item.who==='dudu'?'selected':''}>Dudu</option><option value="beli" ${item.who==='beli'?'selected':''}>Beli</option></select>`;
   const f=document.getElementById('modal-fields');
   if(isEntrada){
-    f.innerHTML=`<label>Data</label><input id="f-data" value="${item.data||''}"><label>Origem</label><input id="f-origem" value="${item.origem||''}"><label>Serviço</label><input id="f-servico" value="${item.servico||''}"><label>Valor (R$)</label><input id="f-valor" type="number" value="${item.valor}" step="0.01"><label>Dízimo?</label><select id="f-dizimo"><option value="sim" ${item.dizimo?'selected':''}>SIM</option><option value="nao" ${!item.dizimo?'selected':''}>NÃO</option></select>${who}`;
+    f.innerHTML=`<label>Data</label>${dateInputHtml('f-data',item.data||'')}<label>Origem</label><input id="f-origem" value="${item.origem||''}"><label>Serviço</label><input id="f-servico" value="${item.servico||''}"><label>Valor (R$)</label><input id="f-valor" type="number" value="${item.valor}" step="0.01"><label>Dízimo?</label><select id="f-dizimo"><option value="sim" ${item.dizimo?'selected':''}>SIM</option><option value="nao" ${!item.dizimo?'selected':''}>NÃO</option></select><label>Forma de Recebimento</label><select id="f-pagamento">${pagamentoSelectHtml(item.pagamento||'')}</select>${who}`;
   } else {
     const catOpts=CAT_OPTIONS.map(c=>`<option value="${c.value}" ${foundCat===c.value?'selected':''}>${c.label}</option>`).join('');
-    f.innerHTML=`<label>Categoria</label><select id="f-cat">${catOpts}</select><label>Data</label><input id="f-data" value="${item.data||''}"><label>Descrição</label><input id="f-desc" value="${item.desc||''}"><label>Valor (R$)</label><input id="f-valor" type="number" value="${item.valor}" step="0.01">${who}`;
+    f.innerHTML=`<label>Categoria</label><select id="f-cat">${catOpts}</select><label>Data</label>${dateInputHtml('f-data',item.data||'')}<label>Descrição</label><input id="f-desc" value="${item.desc||''}"><label>Valor (R$)</label><input id="f-valor" type="number" value="${item.valor}" step="0.01"><label>Forma de Pagamento</label><select id="f-pagamento">${pagamentoSelectHtml(item.pagamento||'')}</select>${who}`;
     f.dataset.origCat=foundCat;
   }
   document.getElementById('modal-overlay').classList.add('open');
@@ -1060,10 +1176,10 @@ window.openModal=function(type){
   const who=`<label>Quem registrou?</label><select id="f-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select>`;
   const f=document.getElementById('modal-fields');
   if(type==='entrada'){
-    f.innerHTML=`<label>Data</label><input id="f-data" placeholder="Ex: 05/06"><label>Origem</label><input id="f-origem" placeholder="Ex: ANGLO"><label>Serviço</label><input id="f-servico" placeholder="Ex: Edição de Vídeo"><label>Valor (R$)</label><input id="f-valor" type="number" placeholder="0,00" step="0.01"><label>Dízimo?</label><select id="f-dizimo"><option value="sim">SIM</option><option value="nao">NÃO</option></select>${who}`;
+    f.innerHTML=`<label>Data</label>${dateInputHtml('f-data','')}<label>Origem</label><input id="f-origem" placeholder="Ex: ANGLO"><label>Serviço</label><input id="f-servico" placeholder="Ex: Edição de Vídeo"><label>Valor (R$)</label><input id="f-valor" type="number" placeholder="0,00" step="0.01"><label>Dízimo?</label><select id="f-dizimo"><option value="sim">SIM</option><option value="nao">NÃO</option></select><label>Forma de Recebimento</label><select id="f-pagamento">${pagamentoSelectHtml('')}</select>${who}`;
   } else {
     const catOpts=CAT_OPTIONS.map(c=>`<option value="${c.value}">${c.label}</option>`).join('');
-    f.innerHTML=`<label>Categoria</label><select id="f-cat">${catOpts}</select><label>Data</label><input id="f-data" placeholder="Ex: 05/06"><label>Descrição</label><input id="f-desc" placeholder="Descreva o gasto"><label>Valor (R$)</label><input id="f-valor" type="number" placeholder="0,00" step="0.01">${who}`;
+    f.innerHTML=`<label>Categoria</label><select id="f-cat">${catOpts}</select><label>Data</label>${dateInputHtml('f-data','')}<label>Descrição</label><input id="f-desc" placeholder="Descreva o gasto"><label>Valor (R$)</label><input id="f-valor" type="number" placeholder="0,00" step="0.01"><label>Forma de Pagamento</label><select id="f-pagamento">${pagamentoSelectHtml('')}</select>${who}`;
   }
   document.getElementById('modal-overlay').classList.add('open');
   setTimeout(()=>document.querySelector('#modal-fields select, #modal-fields input')?.focus(),100);
@@ -1076,16 +1192,16 @@ window.saveModal=function(){
   const valor=parseFloat(document.getElementById('f-valor')?.value)||0;
   if(valor<=0){alert('Informe um valor válido.');return;}
   const who=document.getElementById('f-who')?.value||'dudu';
-  const data=document.getElementById('f-data')?.value||'';
+  const data=readDateInput('f-data');
 
   if(editingKey){
     let foundCat=null;
     for(const c of CATEGORIES){ if(localData[c].find(i=>i._key===editingKey)){foundCat=c;break;} }
     if(modalType==='entrada'){
-      update(ref(db,`meses/${currentMonth}/entradas/${editingKey}`),{data,origem:document.getElementById('f-origem')?.value||'',servico:document.getElementById('f-servico')?.value||'',dizimo:document.getElementById('f-dizimo')?.value==='sim',valor,who});
+      update(ref(db,`meses/${currentMonth}/entradas/${editingKey}`),{data,origem:document.getElementById('f-origem')?.value||'',servico:document.getElementById('f-servico')?.value||'',dizimo:document.getElementById('f-dizimo')?.value==='sim',valor,who,pagamento:document.getElementById('f-pagamento')?.value||''});
     } else {
       const newCat=document.getElementById('f-cat')?.value||foundCat;
-      const newItem={data,desc:document.getElementById('f-desc')?.value||'',valor,who};
+      const newItem={data,desc:document.getElementById('f-desc')?.value||'',valor,who,pagamento:document.getElementById('f-pagamento')?.value||''};
       if(foundCat==='fixas'){ newItem.pago=localData.fixas.find(i=>i._key===editingKey)?.pago||false; }
       if(newCat!==foundCat){
         remove(ref(db,`meses/${currentMonth}/${foundCat}/${editingKey}`));
@@ -1099,10 +1215,10 @@ window.saveModal=function(){
 
   // NEW
   if(modalType==='entrada'){
-    push(ref(db,`meses/${currentMonth}/entradas`),{data,origem:document.getElementById('f-origem')?.value||'',servico:document.getElementById('f-servico')?.value||'',dizimo:document.getElementById('f-dizimo')?.value==='sim',valor,who});
+    push(ref(db,`meses/${currentMonth}/entradas`),{data,origem:document.getElementById('f-origem')?.value||'',servico:document.getElementById('f-servico')?.value||'',dizimo:document.getElementById('f-dizimo')?.value==='sim',valor,who,pagamento:document.getElementById('f-pagamento')?.value||''});
   } else {
     const cat=document.getElementById('f-cat')?.value||'fixas';
-    const item={data,desc:document.getElementById('f-desc')?.value||'',valor,who};
+    const item={data,desc:document.getElementById('f-desc')?.value||'',valor,who,pagamento:document.getElementById('f-pagamento')?.value||''};
     if(cat==='fixas') item.pago=false;
     push(ref(db,`meses/${currentMonth}/${cat}`),item);
   }
