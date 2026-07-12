@@ -333,9 +333,62 @@
     header{ padding-top: max(env(safe-area-inset-top), 59px); }
     .summary-card .value{ font-size: 18px; }
   }
+
+  /* ── LOGIN SCREEN ── */
+  #login-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at top left, #1a1f30, #0d0f14);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: rgba(21, 24, 32, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 40px 32px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
+
+<!-- TELA DE LOGIN PREMIUM -->
+<div id="login-screen">
+  <div class="login-card">
+    <div style="text-align: center;">
+      <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 8px;">💰 Finanças</h2>
+      <p style="color: var(--muted); font-size: 13px;">Planilha Dudu & Beli</p>
+    </div>
+    <form id="login-form" onsubmit="window.handleLogin(event)" style="display: flex; flex-direction: column; gap: 16px;">
+      <div>
+        <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">E-mail</label>
+        <input type="email" id="login-email" required style="width: 100%; background: #1c2030; border: 1px solid var(--border); color: #fff; padding: 12px 16px; border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s;" placeholder="seu@email.com">
+      </div>
+      <div>
+        <label style="font-size: 11px; color: var(--muted); display: block; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Senha</label>
+        <input type="password" id="login-password" required style="width: 100%; background: #1c2030; border: 1px solid var(--border); color: #fff; padding: 12px 16px; border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s;" placeholder="••••••••">
+      </div>
+      <div id="login-error" style="color: var(--red); font-size: 12px; display: none; text-align: center; font-weight: 500; line-height: 1.4;"></div>
+      <button type="submit" class="btn" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; font-weight: 700; background: var(--green); color: #000; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; margin-top: 8px;">Entrar</button>
+    </form>
+  </div>
+</div>
 
 <div id="loading"><div class="spinner"></div><h2>Conectando...</h2><p style="color:var(--muted);font-size:12px;">Carregando dados de Dudu & Beli</p></div>
 <div id="sync-badge" class="syncing"><div class="dot-pulse"></div><span id="sync-text">Conectando...</span></div>
@@ -343,7 +396,7 @@
 
 <header>
   <h1>💰 Planilha <span>Dudu & Beli</span></h1>
-  <div class="month-selector">
+  <div class="month-selector" style="display: flex; align-items: center; gap: 10px;">
     <label>Mês:</label>
     <select id="monthSelect" onchange="changeMonth()">
       <option value="2026-06">Junho 2026</option>
@@ -354,6 +407,7 @@
       <option value="2026-11">Novembro 2026</option>
       <option value="2026-12">Dezembro 2026</option>
     </select>
+    <button class="btn secondary" style="padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer;" onclick="window.handleLogout()">Sair</button>
   </div>
 </header>
 
@@ -556,6 +610,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, remove, update, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD6A-XpYZLYZiE65eXwculdmIVey7R_zqM",
@@ -569,6 +624,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
+const auth = getAuth(firebaseApp);
 
 // ── MONTH PERSISTENCE ──
 function getSavedMonth(){
@@ -1289,11 +1345,71 @@ document.addEventListener('keydown',e=>{
 window.addEventListener('offline',()=>setSyncStatus('offline','Sem conexão'));
 window.addEventListener('online',()=>{ setSyncStatus('syncing','Reconectando...'); subscribeMonth(currentMonth); });
 
-// ── INIT ──
-setSyncStatus('syncing','Conectando...');
-subscribeFixasTemplate();
-subscribeMonth(currentMonth);
-setView('bars');
+// ── AUTHENTICATION LIFE CYCLE ──
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // Logado! Carrega a planilha e esconde a tela de login
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('loading').style.display = 'flex';
+    
+    setSyncStatus('syncing','Conectando...');
+    subscribeFixasTemplate();
+    subscribeMonth(currentMonth);
+    setView('bars');
+  } else {
+    // Deslogado! Mostra a tela de login e limpa o estado
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    
+    // Cancela as inscrições do banco para evitar erros de permissão no Firebase
+    unsubscribers.forEach(u => u());
+    unsubscribers = [];
+  }
+});
+
+// ── LOGIN / LOGOUT HANDLERS ──
+window.handleLogin = async function(e) {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  const btn = e.target.querySelector('button');
+  
+  errorEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    showToast('👋 Bem-vindo!');
+  } catch (err) {
+    let msg = 'Erro ao fazer login.';
+    if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      msg = 'E-mail ou senha incorretos.';
+    } else if (err.code === 'auth/too-many-requests') {
+      msg = 'Muitas tentativas falhas. Tente novamente mais tarde.';
+    } else if (err.code === 'auth/invalid-email') {
+      msg = 'E-mail inválido.';
+    }
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
+};
+
+window.handleLogout = async function() {
+  if (confirm('Deseja realmente sair da planilha?')) {
+    try {
+      await signOut(auth);
+      showToast('Até logo!');
+    } catch (err) {
+      alert('Erro ao sair: ' + err.message);
+    }
+  }
+};
+
 // Re-render on resize for responsive switch
 window.addEventListener('resize', ()=>{ renderAll(); });
 </script>
