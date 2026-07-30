@@ -32,7 +32,12 @@ export function renderNav(activeHref){
           </a>
         `).join('')}
       </div>
-      <div class="sidebar-foot">Sincronizado em tempo real</div>
+      <div class="sidebar-foot">
+        <div style="margin-bottom:10px;">Sincronizado em tempo real</div>
+        <button class="nav-link" id="logout-btn" style="width:100%;background:none;border:none;cursor:pointer;">
+          ${iconHtml('x')}<span>Sair</span>
+        </button>
+      </div>
     </nav>
   `;
 
@@ -50,4 +55,9 @@ export function renderNav(activeHref){
   toggle?.addEventListener('click', ()=> sidebar.classList.contains('open') ? closeNav() : openNav());
   overlay?.addEventListener('click', closeNav);
   document.querySelectorAll('.nav-link').forEach(l=>l.addEventListener('click', closeNav));
+
+  document.getElementById('logout-btn')?.addEventListener('click', async ()=>{
+    const { logout } = await import('./auth.js');
+    logout();
+  });
 }
