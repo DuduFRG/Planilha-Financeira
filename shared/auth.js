@@ -1,6 +1,8 @@
 // ============================================
 // Autenticação — email/senha com persistência
 // Mantém Dudu & Beli logados permanentemente no dispositivo
+// Sem "flicker": mostra um único spinner neutro até
+// a sessão ser confirmada, só então decide login x app
 // ============================================
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -21,12 +23,13 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-let persistenceReady = setPersistence(auth, browserLocalPersistence);
+const persistenceReady = setPersistence(auth, browserLocalPersistence);
 
 /**
  * Bloqueia o app até o login ser confirmado.
- * Mostra uma tela de login se não houver sessão válida.
- * Chama onReady() assim que o usuário estiver autenticado.
+ * Mostra UM único overlay: primeiro em estado "verificando sessão",
+ * e só troca para o formulário de login se de fato não houver sessão válida.
+ * Chama onReady(user) assim que autenticado — sem piscar entre telas.
  */
 export function requireAuth(onReady){
   mountGate();
@@ -36,7 +39,9 @@ export function requireAuth(onReady){
         hideGate();
         onReady(user);
       } else {
-        showGate();
+        // Só mostra o formulário depois de confirmar que não há sessão —
+        // nunca antes, para não "piscar" o login para quem já está logado.
+        showLoginForm();
       }
     });
   });
@@ -56,19 +61,27 @@ function mountGate(){
         <svg viewBox="0 0 24 24" class="icon-lg"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
       </div>
       <h1>Dudu &amp; Beli</h1>
-      <p>Entre para acessar o controle financeiro</p>
-      <form id="auth-form" autocomplete="on">
-        <div class="auth-field">
-          <label for="auth-email">E-mail</label>
-          <input type="email" id="auth-email" autocomplete="username" required>
-        </div>
-        <div class="auth-field">
-          <label for="auth-pass">Senha</label>
-          <input type="password" id="auth-pass" autocomplete="current-password" required>
-        </div>
-        <div id="auth-error" class="auth-error" hidden></div>
-        <button type="submit" class="auth-submit" id="auth-submit">Entrar</button>
-      </form>
+
+      <div id="auth-checking" class="auth-checking">
+        <div class="auth-spinner" role="status" aria-label="Verificando sessão"></div>
+        <p>Verificando sessão…</p>
+      </div>
+
+      <div id="auth-form-section" hidden>
+        <p class="auth-sub">Entre para acessar o controle financeiro</p>
+        <form id="auth-form" autocomplete="on">
+          <div class="auth-field">
+            <label for="auth-email">E-mail</label>
+            <input type="email" id="auth-email" autocomplete="username" required>
+          </div>
+          <div class="auth-field">
+            <label for="auth-pass">Senha</label>
+            <input type="password" id="auth-pass" autocomplete="current-password" required>
+          </div>
+          <div id="auth-error" class="auth-error" hidden></div>
+          <button type="submit" class="auth-submit" id="auth-submit">Entrar</button>
+        </form>
+      </div>
     </div>
   `;
   document.body.appendChild(el);
@@ -80,7 +93,11 @@ function mountGate(){
     .auth-mark{ width:52px;height:52px;border-radius:14px;background:#edf252; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
     .auth-mark svg{ width:28px;height:28px; stroke:#020126; fill:none; stroke-width:1.8; }
     .auth-card h1{ font-family:'Space Grotesk',sans-serif; font-size:19px; color:#f2f2f0; margin-bottom:6px; }
-    .auth-card p{ font-size:12.5px; color:#737373; margin-bottom:22px; }
+    .auth-sub{ font-size:12.5px; color:#737373; margin-bottom:22px; }
+    .auth-checking{ padding: 14px 0 6px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+    .auth-checking p{ font-size:12px; color:#737373; }
+    .auth-spinner{ width:30px; height:30px; border:3px solid #262626; border-top-color:#edf252; border-radius:50%; animation:auth-spin .7s linear infinite; }
+    @keyframes auth-spin{ to{ transform:rotate(360deg); } }
     .auth-field{ text-align:left; margin-bottom:14px; }
     .auth-field label{ display:block; font-size:11px; font-weight:600; color:#737373; text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
     .auth-field input{ width:100%; background:#131313; border:1px solid #262626; color:#f2f2f0; padding:11px 13px; border-radius:8px; font-size:13.5px; font-family:'Inter',sans-serif; }
@@ -111,9 +128,11 @@ function mountGate(){
   });
 }
 
-function showGate(){
+function showLoginForm(){
   const el = document.getElementById('auth-gate');
   if(el) el.style.display = 'flex';
+  document.getElementById('auth-checking').hidden = true;
+  document.getElementById('auth-form-section').hidden = false;
   document.getElementById('loading-screen')?.remove();
 }
 function hideGate(){

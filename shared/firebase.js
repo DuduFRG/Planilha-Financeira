@@ -34,10 +34,10 @@ export const CAT_META = {
 };
 
 export const PAGAMENTO_OPTIONS = [
-  { value:'debito',   label:'Débito',   icon:'card' },
-  { value:'credito',  label:'Crédito',  icon:'card' },
-  { value:'pix',      label:'PIX',      icon:'qrcode' },
-  { value:'dinheiro', label:'Dinheiro', icon:'cash' },
+  { value:'debito',   label:'Débito',   icon:'card',   color:'#4C8DFF' },
+  { value:'credito',  label:'Crédito',  icon:'card',   color:'#F2994A' },
+  { value:'pix',      label:'PIX',      icon:'qrcode', color:'#3FBF88' },
+  { value:'dinheiro', label:'Dinheiro', icon:'cash',   color:'#EDF252' },
 ];
 
 // ── Helpers de formatação ──

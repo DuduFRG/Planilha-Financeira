@@ -136,16 +136,16 @@
     <div class="modal-head"><span data-icon="expense"></span><h2 id="modal-gasto-title">Novo Gasto</h2></div>
     <div class="field">
       <label for="f-cat">Categoria</label>
-      <select id="f-cat"></select>
+      <div id="f-cat"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label for="f-data">Data</label><input type="date" id="f-data"></div>
+      <div class="field"><label>Data</label><div id="f-data"></div></div>
       <div class="field"><label for="f-valor">Valor (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
     </div>
     <div class="field"><label for="f-desc">Descrição</label><input type="text" id="f-desc" placeholder="Descreva o gasto"></div>
     <div class="field-row">
-      <div class="field"><label for="f-pagamento">Forma de Pagamento</label><select id="f-pagamento"></select></div>
-      <div class="field"><label for="f-who">Quem registrou?</label><select id="f-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select></div>
+      <div class="field"><label>Forma de Pagamento</label><div id="f-pagamento"></div></div>
+      <div class="field"><label>Quem registrou?</label><div id="f-who"></div></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modal-gasto-cancel">Cancelar</button>
@@ -206,6 +206,7 @@ import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import { createSelect, createDatePicker, stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update, get,
   CAT_META, PAGAMENTO_OPTIONS, brl, sum, sortByDate,
@@ -235,20 +236,18 @@ function pagamentoTag(item){
   if(!item.pagamento) return '';
   const opt = PAGAMENTO_OPTIONS.find(p=>p.value===item.pagamento);
   if(!opt) return '';
-  return `<span class="tag tag-pay">${iconHtml(opt.icon)}${opt.label}</span>`;
+  return `<span class="tag tag-pay-${opt.value}">${iconHtml(opt.icon)}${opt.label}</span>`;
 }
 
-// ── Populate selects ──
-function fillCatSelect(){
-  const sel = document.getElementById('f-cat');
-  sel.innerHTML = CAT_ORDER.map(k=>`<option value="${k}">${CAT_META[k].label}</option>`).join('');
-}
-function fillPagamentoSelect(selected=''){
-  const sel = document.getElementById('f-pagamento');
-  sel.innerHTML = `<option value="">— Não informado —</option>` + PAGAMENTO_OPTIONS.map(p=>`<option value="${p.value}" ${p.value===selected?'selected':''}>${p.label}</option>`).join('');
-}
-fillCatSelect();
-fillPagamentoSelect();
+// ── Controles customizados do modal de gasto ──
+const catOptions = CAT_ORDER.map(k=>({ value:k, label:CAT_META[k].label, icon:CAT_META[k].icon, color:CAT_META[k].color }));
+const pagamentoOptions = [{ value:'', label:'— Não informado —' }, ...PAGAMENTO_OPTIONS];
+const whoOptions = [{ value:'dudu', label:'Dudu', color:'#4C8DFF' }, { value:'beli', label:'Beli', color:'#ff6ea1' }];
+
+const catSelect = createSelect(document.getElementById('f-cat'), { options: catOptions, value:'fixas' });
+const dataPicker = createDatePicker(document.getElementById('f-data'), {});
+const pagamentoSelect = createSelect(document.getElementById('f-pagamento'), { options: pagamentoOptions, value:'', placeholder:'— Não informado —' });
+const whoSelect = createSelect(document.getElementById('f-who'), { options: whoOptions, value:'dudu' });
 
 function boot(){
   if(unsubscribe) unsubscribe();
@@ -283,7 +282,7 @@ function defaultRow(item, cat){
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
-      <div class="list-main"><strong>${item.desc||''}</strong></div>
+      <div class="list-main"><strong>${stripLeadingEmoji(item.desc)||''}</strong></div>
       <div class="list-tags">${who}${pagamentoTag(item)}</div>
       <div class="list-value neg">${brl(item.valor)}</div>
       <div class="list-actions">
@@ -300,7 +299,7 @@ function fixaRow(item){
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
-      <div class="list-main"><strong>${item.desc||''}</strong></div>
+      <div class="list-main"><strong>${stripLeadingEmoji(item.desc)||''}</strong></div>
       <div class="list-tags">${who}${pagamentoTag(item)}</div>
       <div class="list-value neg">${valDisplay}</div>
       <div class="list-actions" style="opacity:1;">
@@ -335,7 +334,6 @@ function renderIndefinidos(){
   document.getElementById('indef-count').textContent = arr.length;
   if(!arr.length){ panel.style.display = 'none'; return; }
   panel.style.display = 'block';
-  const catOpts = CAT_ORDER.map(k=>`<option value="${k}">${CAT_META[k].label}</option>`).join('');
   list.innerHTML = arr.map(item=>`
     <div class="indef-card">
       <div class="indef-top">
@@ -343,18 +341,21 @@ function renderIndefinidos(){
         <span class="indef-date">${item.data||'—'}</span>
         <button class="icon-btn del" data-del="indefinidos:${item._key}">${iconHtml('trash')}</button>
       </div>
-      <input type="text" id="iname-${item._key}" value="${item.desc||''}" placeholder="Nome do gasto"
+      <input type="text" id="iname-${item._key}" value="${stripLeadingEmoji(item.desc)||''}" placeholder="Nome do gasto"
         style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:12.5px;">
-      <div style="display:flex;gap:8px;">
-        <select id="icat-${item._key}" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:12.5px;">
-          <option value="">Selecionar categoria…</option>${catOpts}
-        </select>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div id="icat-${item._key}" style="flex:1;"></div>
         <button class="btn btn-primary btn-sm" data-confirm-indef="${item._key}">Mover</button>
       </div>
     </div>
   `).join('');
   mountIcons(list);
+  arr.forEach(item=>{
+    const mount = document.getElementById(`icat-${item._key}`);
+    if(mount) indefCatSelects[item._key] = createSelect(mount, { options: catOptions, value:'', placeholder:'Selecionar categoria…' });
+  });
 }
+const indefCatSelects = {};
 
 // ── DELEGATED CLICK HANDLING ──
 document.addEventListener('click', (e)=>{
@@ -388,7 +389,7 @@ document.addEventListener('click', (e)=>{
   const confirmIndef = e.target.closest('[data-confirm-indef]');
   if(confirmIndef){
     const key = confirmIndef.dataset.confirmIndef;
-    const catSel = document.getElementById(`icat-${key}`);
+    const catSel = indefCatSelects[key];
     if(!catSel?.value){ showToast('Selecione uma categoria','error'); return; }
     const item = (localData.indefinidos||[]).find(i=>i._key===key);
     if(!item) return;
@@ -397,6 +398,7 @@ document.addEventListener('click', (e)=>{
     if(catSel.value==='fixas') newItem.pago = false;
     remove(ref(db, `meses/${currentMonth}/indefinidos/${key}`));
     push(ref(db, `meses/${currentMonth}/${catSel.value}`), newItem);
+    delete indefCatSelects[key];
     showToast('Movido com sucesso');
     return;
   }
@@ -411,12 +413,12 @@ modalGasto.addEventListener('click', e=>{ if(e.target===modalGasto) closeModal(m
 function openAddModal(){
   editingKey = null; editingCat = null;
   document.getElementById('modal-gasto-title').textContent = 'Novo Gasto';
-  document.getElementById('f-cat').value = 'fixas';
-  document.getElementById('f-data').value = '';
+  catSelect.value = 'fixas';
+  dataPicker.value = '';
   document.getElementById('f-valor').value = '';
   document.getElementById('f-desc').value = '';
-  fillPagamentoSelect('');
-  document.getElementById('f-who').value = 'dudu';
+  pagamentoSelect.value = '';
+  whoSelect.value = 'dudu';
   openModal(modalGasto);
 }
 
@@ -426,12 +428,12 @@ function openEditModal(key){
   if(!item) return;
   editingKey = itemKey; editingCat = cat;
   document.getElementById('modal-gasto-title').textContent = 'Editar Gasto';
-  document.getElementById('f-cat').value = cat;
-  document.getElementById('f-data').value = ddmmToISOLocal(item.data);
+  catSelect.value = cat;
+  dataPicker.value = ddmmToISOLocal(item.data);
   document.getElementById('f-valor').value = item.valor;
-  document.getElementById('f-desc').value = item.desc||'';
-  fillPagamentoSelect(item.pagamento||'');
-  document.getElementById('f-who').value = item.who||'dudu';
+  document.getElementById('f-desc').value = stripLeadingEmoji(item.desc)||'';
+  pagamentoSelect.value = item.pagamento||'';
+  whoSelect.value = item.who||'dudu';
   openModal(modalGasto);
 }
 
@@ -450,11 +452,11 @@ function isoToDDMMLocal(iso){
 document.getElementById('modal-gasto-save').addEventListener('click', ()=>{
   const valor = parseFloat(document.getElementById('f-valor').value)||0;
   if(valor<=0){ showToast('Informe um valor válido','error'); return; }
-  const cat = document.getElementById('f-cat').value;
-  const data = isoToDDMMLocal(document.getElementById('f-data').value);
+  const cat = catSelect.value;
+  const data = isoToDDMMLocal(dataPicker.value);
   const desc = document.getElementById('f-desc').value||'';
-  const pagamento = document.getElementById('f-pagamento').value||'';
-  const who = document.getElementById('f-who').value;
+  const pagamento = pagamentoSelect.value||'';
+  const who = whoSelect.value;
   const payload = { data, desc, valor, who };
   if(pagamento) payload.pagamento = pagamento;
   if(cat==='fixas' && editingKey===null) payload.pago = false;
@@ -478,6 +480,7 @@ document.getElementById('modal-gasto-save').addEventListener('click', ()=>{
   }
   closeModal(modalGasto);
 });
+
 
 // ── MODAL: Gerenciar Contas Fixas ──
 const modalFixas = document.getElementById('modal-fixas');

@@ -20,6 +20,15 @@
   .dizimo-pill{ border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:20px; }
   .dizimo-yes{ background:var(--success-dim); color:var(--success); }
   .dizimo-no{ background:var(--danger-dim); color:var(--danger); }
+  .parcelas-wrap{ margin-top:14px; }
+  .parcela-row{ display:grid; grid-template-columns:1fr 100px auto; gap:8px; align-items:end; margin-bottom:10px; }
+  .parcela-row .pnum{ grid-column:1/-1; font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; font-weight:600; margin-bottom:-2px; }
+  .parcela-remove{ width:36px; height:36px; border-radius:8px; background:var(--danger-dim); color:var(--danger); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .parcela-add{ margin-top:2px; }
+  .parcela-summary{ font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; justify-content:space-between; }
+  .parcela-summary strong{ color:var(--text); }
+  .parcela-summary.mismatch{ color:var(--danger); }
+  .forma-tag{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; padding:3px 8px; border-radius:6px; background:var(--surface-3); color:var(--text-muted); }
 </style>
 </head>
 <body>
@@ -71,21 +80,25 @@
 
 <!-- MODAL: Adicionar/Editar Freela -->
 <div class="modal-overlay" id="modal-freela">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-freela-title">
+  <div class="modal" style="width:480px;" role="dialog" aria-modal="true" aria-labelledby="modal-freela-title">
     <div class="modal-head"><span data-icon="bolt"></span><h2 id="modal-freela-title">Novo Freela</h2></div>
     <div class="field-row">
-      <div class="field"><label for="f-data">Data</label><input type="date" id="f-data"></div>
-      <div class="field"><label for="f-valor">Valor (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
+      <div class="field"><label>Data</label><div id="f-data"></div></div>
+      <div class="field"><label for="f-valor">Valor Total (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
     </div>
     <div class="field"><label for="f-origem">Origem / Cliente</label><input type="text" id="f-origem" placeholder="Ex: Anglo Marketing"></div>
     <div class="field"><label for="f-servico">Serviço prestado</label><input type="text" id="f-servico" placeholder="Ex: Edição de Vídeo"></div>
     <div class="field-row">
-      <div class="field">
-        <label for="f-dizimo">Dízimo pago?</label>
-        <select id="f-dizimo"><option value="nao">Não</option><option value="sim">Sim</option></select>
-      </div>
-      <div class="field"><label for="f-who">Quem registrou?</label><select id="f-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select></div>
+      <div class="field"><label>Dízimo pago?</label><div id="f-dizimo"></div></div>
+      <div class="field"><label>Quem registrou?</label><div id="f-who"></div></div>
     </div>
+
+    <div class="field">
+      <label>Forma de Recebimento</label>
+      <div id="f-forma"></div>
+    </div>
+    <div id="parcelas-wrap" class="parcelas-wrap"></div>
+
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modal-freela-cancel">Cancelar</button>
       <button class="btn btn-primary" id="modal-freela-save">Salvar</button>
@@ -106,7 +119,7 @@
         <div class="field"><label for="nf-val">Valor (R$)</label><input type="number" id="nf-val" step="0.01" placeholder="0,00"></div>
         <div class="field"><label for="nf-dia">Dia de recebimento</label><input type="number" id="nf-dia" min="1" max="31" placeholder="5"></div>
       </div>
-      <div class="field"><label for="nf-who">Quem recebe?</label><select id="nf-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select></div>
+      <div class="field"><label>Quem recebe?</label><div id="nf-who"></div></div>
       <button class="btn btn-primary btn-block" id="btn-add-fixa-entrada" style="margin-top:6px;"><span data-icon="plus"></span>Adicionar Entrada Fixa</button>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" id="modal-fixas-entrada-close">Fechar</button></div>
@@ -118,6 +131,7 @@ import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import { createSelect, createDatePicker, stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update,
   brl, sum, sortByDate,
@@ -139,6 +153,16 @@ let localData = {};
 let entradasTemplate = [];
 let unsubscribe = null;
 let editingKey = null;
+let editingIsFixa = false;
+
+const FORMA_OPTIONS = [
+  { value:'avista',        label:'À Vista (1x)' },
+  { value:'5050',          label:'50/50 (2 parcelas iguais)' },
+  { value:'2x',            label:'2x (valores livres)' },
+  { value:'personalizado', label:'Personalizado (N parcelas)' },
+];
+const whoOptions = [{ value:'dudu', label:'Dudu', color:'#4C8DFF' }, { value:'beli', label:'Beli', color:'#ff6ea1' }];
+const dizimoOptions = [{ value:'nao', label:'Não' }, { value:'sim', label:'Sim' }];
 
 function boot(){
   if(unsubscribe) unsubscribe();
@@ -156,13 +180,22 @@ subscribeEntradasTemplate(arr=>{
   seedEntradasFromTemplate(currentMonth, entradasTemplate);
 });
 
+function formaLabel(item){
+  if(!item.formaRecebimento) return '';
+  const opt = FORMA_OPTIONS.find(f=>f.value===item.formaRecebimento);
+  if(!opt) return '';
+  const n = item.parcelas?.length || 1;
+  const shortLabel = item.formaRecebimento==='avista' ? 'À Vista' : item.formaRecebimento==='5050' ? '50/50' : item.formaRecebimento==='2x' ? '2x' : `${n}x personalizado`;
+  return `<span class="forma-tag">${iconHtml('layers','icon icon-sm')}${shortLabel}</span>`;
+}
+
 function dizimoRow(item){
   const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
   const dv = item.dizimo === true;
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
-      <div class="list-main"><strong>${item.origem||'—'}</strong><span>${item.servico||''}</span></div>
+      <div class="list-main"><strong>${stripLeadingEmoji(item.origem)||'—'}</strong><span>${item.servico||''}</span></div>
       <div class="list-tags">
         <button class="dizimo-pill ${dv?'dizimo-yes':'dizimo-no'}" data-toggle-dizimo="${item._key}:${dv}">Dízimo: ${dv?'Sim':'Não'}</button>
         ${who}
@@ -179,8 +212,8 @@ function freelaRow(item){
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
-      <div class="list-main"><strong>${item.origem||'—'}</strong><span>${item.servico||''}</span></div>
-      <div class="list-tags">${who}</div>
+      <div class="list-main"><strong>${stripLeadingEmoji(item.origem)||'—'}</strong><span>${item.servico||''}</span></div>
+      <div class="list-tags">${formaLabel(item)}${who}</div>
       <div class="list-value pos">+${brl(item.valor)}</div>
       <div class="list-actions">
         <button class="icon-btn" data-edit="freela:${item._key}">${iconHtml('edit')}</button>
@@ -253,20 +286,136 @@ document.addEventListener('click', e=>{
   }
 });
 
+// ── Controles customizados do modal de freela ──
+const dataPicker = createDatePicker(document.getElementById('f-data'), {});
+const dizimoSelect = createSelect(document.getElementById('f-dizimo'), { options: dizimoOptions, value:'nao' });
+const whoSelect = createSelect(document.getElementById('f-who'), { options: whoOptions, value:'dudu' });
+const formaSelect = createSelect(document.getElementById('f-forma'), {
+  options: FORMA_OPTIONS, value:'avista',
+  onChange: (val)=> renderParcelas(val, currentParcelas())
+});
+
+// ── Editor de parcelas (ponto 2: totalmente editável — à vista, 50/50, 2x, personalizado) ──
+let parcelaPickers = []; // referências dos date pickers de cada parcela
+
+function currentParcelas(){
+  const valorTotal = parseFloat(document.getElementById('f-valor').value)||0;
+  return buildDefaultParcelas(formaSelect.value, valorTotal);
+}
+
+function buildDefaultParcelas(forma, valorTotal){
+  const today = dataPicker.value || new Date().toISOString().slice(0,10);
+  if(forma==='avista'){
+    return [{ valor: valorTotal, data: today, pago:true }];
+  }
+  if(forma==='5050'){
+    const metade = Math.round((valorTotal/2)*100)/100;
+    return [{ valor: metade, data: today, pago:false }, { valor: valorTotal-metade, data: today, pago:false }];
+  }
+  if(forma==='2x'){
+    const metade = Math.round((valorTotal/2)*100)/100;
+    return [{ valor: metade, data: today, pago:false }, { valor: valorTotal-metade, data: today, pago:false }];
+  }
+  // personalizado — começa com 2 parcelas editáveis, usuário pode adicionar/remover
+  const metade = Math.round((valorTotal/2)*100)/100;
+  return [{ valor: metade, data: today, pago:false }, { valor: valorTotal-metade, data: today, pago:false }];
+}
+
+function renderParcelas(forma, parcelas){
+  const wrap = document.getElementById('parcelas-wrap');
+  parcelaPickers = [];
+
+  if(forma==='avista'){
+    wrap.innerHTML = `<p style="font-size:11.5px;color:var(--text-muted);">Pagamento único — o valor total é recebido de uma vez.</p>`;
+    return;
+  }
+
+  const rowsHtml = parcelas.map((p,i)=>`
+    <div class="parcela-row" data-idx="${i}">
+      <div class="pnum">Parcela ${i+1}</div>
+      <input type="number" step="0.01" class="parcela-valor" value="${p.valor}" placeholder="Valor">
+      <div class="parcela-date" data-idx="${i}"></div>
+      ${forma==='personalizado' ? `<button type="button" class="parcela-remove" data-remove-parcela="${i}">${iconHtml('trash','icon icon-sm')}</button>` : '<span></span>'}
+    </div>
+  `).join('');
+
+  wrap.innerHTML = `
+    ${rowsHtml}
+    ${forma==='personalizado' ? `<button type="button" class="btn btn-outline btn-sm parcela-add" id="btn-add-parcela"><span data-icon="plus"></span>Adicionar Parcela</button>` : ''}
+    <div class="parcela-summary" id="parcela-summary"></div>
+  `;
+  mountIcons(wrap);
+
+  wrap.querySelectorAll('.parcela-date').forEach((el,i)=>{
+    const picker = createDatePicker(el, { value: parcelas[i]?.data || '', onChange: updateSummary });
+    parcelaPickers[i] = picker;
+  });
+
+  wrap.querySelectorAll('.parcela-valor').forEach(inp=>{
+    inp.addEventListener('input', updateSummary);
+  });
+
+  document.getElementById('btn-add-parcela')?.addEventListener('click', ()=>{
+    const current = readParcelasFromDOM();
+    current.push({ valor:0, data: new Date().toISOString().slice(0,10), pago:false });
+    renderParcelas('personalizado', current);
+  });
+
+  wrap.querySelectorAll('[data-remove-parcela]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = parseInt(btn.dataset.removeParcela);
+      const current = readParcelasFromDOM();
+      current.splice(idx,1);
+      renderParcelas('personalizado', current.length ? current : [{valor:0,data:new Date().toISOString().slice(0,10),pago:false}]);
+    });
+  });
+
+  updateSummary();
+}
+
+function readParcelasFromDOM(){
+  const wrap = document.getElementById('parcelas-wrap');
+  const rows = [...wrap.querySelectorAll('.parcela-row')];
+  return rows.map((row,i)=>({
+    valor: parseFloat(row.querySelector('.parcela-valor')?.value)||0,
+    data: parcelaPickers[i]?.value || '',
+    pago: false
+  }));
+}
+
+function updateSummary(){
+  const summaryEl = document.getElementById('parcela-summary');
+  if(!summaryEl) return;
+  const parcelas = readParcelasFromDOM();
+  const somaParcelas = parcelas.reduce((a,p)=>a+p.valor,0);
+  const valorTotal = parseFloat(document.getElementById('f-valor').value)||0;
+  const mismatch = Math.abs(somaParcelas - valorTotal) > 0.01;
+  summaryEl.className = 'parcela-summary' + (mismatch ? ' mismatch' : '');
+  summaryEl.innerHTML = `<span>Soma das parcelas: <strong>${brl(somaParcelas)}</strong></span><span>${mismatch ? 'Diferente do total (' + brl(valorTotal) + ')' : 'Confere com o total'}</span>`;
+}
+
+document.getElementById('f-valor').addEventListener('input', ()=>{
+  renderParcelas(formaSelect.value, currentParcelas());
+});
+
 // ── MODAL: Freela add/edit ──
 const modalFreela = document.getElementById('modal-freela');
 document.getElementById('btn-add-freela').addEventListener('click', ()=>{
-  editingKey = null;
+  editingKey = null; editingIsFixa = false;
   document.getElementById('modal-freela-title').textContent = 'Novo Freela';
-  document.getElementById('f-data').value=''; document.getElementById('f-valor').value='';
-  document.getElementById('f-origem').value=''; document.getElementById('f-servico').value='';
-  document.getElementById('f-dizimo').value='nao'; document.getElementById('f-who').value='dudu';
+  dataPicker.value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-valor').value = '';
+  document.getElementById('f-origem').value = '';
+  document.getElementById('f-servico').value = '';
+  dizimoSelect.value = 'nao';
+  whoSelect.value = 'dudu';
+  formaSelect.value = 'avista';
+  renderParcelas('avista', []);
   openModal(modalFreela);
 });
 document.getElementById('modal-freela-cancel').addEventListener('click', ()=> closeModal(modalFreela));
 modalFreela.addEventListener('click', e=>{ if(e.target===modalFreela) closeModal(modalFreela); });
 
-let editingIsFixa = false;
 function openEditFreela(type, key){
   editingIsFixa = type === 'fixaentrada';
   const arr = editingIsFixa ? (localData.entradas||[]) : (localData.entradasFreela||[]);
@@ -274,12 +423,15 @@ function openEditFreela(type, key){
   if(!item) return;
   editingKey = key;
   document.getElementById('modal-freela-title').textContent = editingIsFixa ? 'Editar Entrada Fixa' : 'Editar Freela';
-  document.getElementById('f-data').value = ddmmToISOLocal(item.data);
+  dataPicker.value = ddmmToISOLocal(item.data);
   document.getElementById('f-valor').value = item.valor;
-  document.getElementById('f-origem').value = item.origem||'';
+  document.getElementById('f-origem').value = stripLeadingEmoji(item.origem)||'';
   document.getElementById('f-servico').value = item.servico||'';
-  document.getElementById('f-dizimo').value = item.dizimo ? 'sim':'nao';
-  document.getElementById('f-who').value = item.who||'dudu';
+  dizimoSelect.value = item.dizimo ? 'sim':'nao';
+  whoSelect.value = item.who||'dudu';
+  const forma = item.formaRecebimento || 'avista';
+  formaSelect.value = forma;
+  renderParcelas(forma, item.parcelas && item.parcelas.length ? item.parcelas : buildDefaultParcelas(forma, item.valor));
   openModal(modalFreela);
 }
 function ddmmToISOLocal(ddmm){
@@ -297,13 +449,20 @@ function isoToDDMMLocal(iso){
 document.getElementById('modal-freela-save').addEventListener('click', ()=>{
   const valor = parseFloat(document.getElementById('f-valor').value)||0;
   if(valor<=0){ showToast('Informe um valor válido','error'); return; }
+  const forma = formaSelect.value;
+  const parcelas = forma==='avista'
+    ? [{ valor, data: isoToDDMMLocal(dataPicker.value), pago:true }]
+    : readParcelasFromDOM().map(p=>({ ...p, data: isoToDDMMLocal(p.data) }));
+
   const payload = {
-    data: isoToDDMMLocal(document.getElementById('f-data').value),
+    data: isoToDDMMLocal(dataPicker.value),
     origem: document.getElementById('f-origem').value||'',
     servico: document.getElementById('f-servico').value||'',
     valor,
-    dizimo: document.getElementById('f-dizimo').value==='sim',
-    who: document.getElementById('f-who').value,
+    dizimo: dizimoSelect.value==='sim',
+    who: whoSelect.value,
+    formaRecebimento: forma,
+    parcelas,
   };
   if(editingKey){
     const targetCat = editingIsFixa ? 'entradas' : 'entradasFreela';
@@ -318,6 +477,7 @@ document.getElementById('modal-freela-save').addEventListener('click', ()=>{
 
 // ── MODAL: Gerenciar Entradas Fixas ──
 const modalFixasEntrada = document.getElementById('modal-fixas-entrada');
+const nfWhoSelect = createSelect(document.getElementById('nf-who'), { options: whoOptions, value:'dudu' });
 document.getElementById('btn-manage-fixas').addEventListener('click', ()=>{
   renderFixasEntradaList();
   openModal(modalFixasEntrada);
@@ -333,7 +493,7 @@ function renderFixasEntradaList(){
   }
   el.innerHTML = entradasTemplate.map(t=>`
     <div class="manage-row">
-      <span class="mname">${t.origem||''} <span style="color:var(--text-muted);font-weight:400;">— dia ${t.dia||'—'}</span></span>
+      <span class="mname">${stripLeadingEmoji(t.origem)||''} <span style="color:var(--text-muted);font-weight:400;">— dia ${t.dia||'—'}</span></span>
       <span class="mval">${brl(t.valor)}</span>
       <button class="icon-btn" data-edit-etpl="${t._key}">${iconHtml('edit')}</button>
       <button class="icon-btn del" data-del-etpl="${t._key}">${iconHtml('trash')}</button>
@@ -345,7 +505,7 @@ document.getElementById('btn-add-fixa-entrada').addEventListener('click', ()=>{
   const origem = document.getElementById('nf-origem').value.trim();
   const val = parseFloat(document.getElementById('nf-val').value)||0;
   const dia = parseInt(document.getElementById('nf-dia').value)||1;
-  const who = document.getElementById('nf-who').value;
+  const who = nfWhoSelect.value;
   if(!origem || val<=0){ showToast('Preencha origem e valor','error'); return; }
 
   push(ref(db,'entradasTemplate'), { origem, valor:val, dia, who, servico:'Renda fixa' });

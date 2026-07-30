@@ -114,6 +114,7 @@ import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import { stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, CATEGORIES, CAT_META, brl, sum, sortByDate,
   getSavedMonth, monthLabel, subscribeMonth
@@ -247,7 +248,7 @@ function renderAll(){
     recentEl.innerHTML = `<div class="empty-state">${iconHtml('layers')}<strong>Sem lançamentos</strong><p>Adicione entradas ou gastos para ver o histórico aqui.</p></div>`;
   } else {
     recentEl.innerHTML = recent.map(item=>{
-      const name = item.origem || item.desc || 'Lançamento';
+      const name = stripLeadingEmoji(item.origem || item.desc) || 'Lançamento';
       const sub = item.servico || (item._cat==='entrada' ? 'Entrada' : 'Gasto');
       const whoTag = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
       return `
