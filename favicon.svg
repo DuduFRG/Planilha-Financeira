@@ -1,5 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <rect width="100" height="100" rx="22" fill="#020126"/>
-  <path d="M50 20 L50 80 M20 50 L80 50" stroke="#EDF252" stroke-width="9" stroke-linecap="round"/>
-  <circle cx="50" cy="50" r="34" fill="none" stroke="#EDF252" stroke-width="7"/>
+  <!-- Nota de dinheiro -->
+  <rect x="14" y="32" width="72" height="40" rx="5" fill="none" stroke="#EDF252" stroke-width="4.5"/>
+  <!-- Selo central (oval) -->
+  <circle cx="50" cy="52" r="11" fill="none" stroke="#EDF252" stroke-width="3.5"/>
+  <circle cx="50" cy="52" r="4" fill="#EDF252"/>
+  <!-- Cantos com marcas de valor -->
+  <path d="M22 42h5M22 62h5M73 42h5M73 62h5" stroke="#BBBF49" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Linha de segurança -->
+  <path d="M14 40h72" stroke="#BBBF49" stroke-width="1.5" opacity="0.55"/>
 </svg>
