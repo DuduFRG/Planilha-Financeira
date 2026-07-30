@@ -204,6 +204,7 @@
 <script type="module">
 import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
+import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
 import {
   db, ref, onValue, push, remove, update, get,
@@ -618,7 +619,7 @@ document.addEventListener('keydown', e=>{
 window.addEventListener('online', ()=>{ setSyncStatus('syncing','Reconectando…'); boot(); });
 window.addEventListener('offline', ()=> setSyncStatus('offline','Sem conexão'));
 
-boot();
+requireAuth(()=>{ boot(); });
 </script>
 </body>
 </html>

@@ -112,6 +112,7 @@
 <script type="module">
 import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
+import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
 import {
   db, ref, onValue, CATEGORIES, CAT_META, brl, sum, sortByDate,
@@ -307,7 +308,7 @@ function renderChart(entradas, gastos){
 window.addEventListener('online', ()=>{ setSyncStatus('syncing','Reconectando…'); boot(); });
 window.addEventListener('offline', ()=> setSyncStatus('offline','Sem conexão'));
 
-boot();
+requireAuth(()=>{ boot(); });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </body>
