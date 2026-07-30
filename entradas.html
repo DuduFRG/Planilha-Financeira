@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Entradas — Dudu &amp; Beli</title>
+<meta name="description" content="Entradas fixas e freelas de Dudu e Beli.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#020126">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+  .manage-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft); }
+  .manage-row:last-child{ border-bottom:none; }
+  .manage-row .mname{ flex:1; font-size:12.5px; font-weight:500; }
+  .manage-row .mval{ font-size:12px; color:var(--success); font-weight:600; min-width:88px; text-align:right; }
+  .dizimo-pill{ border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:4px 10px; border-radius:20px; }
+  .dizimo-yes{ background:var(--success-dim); color:var(--success); }
+  .dizimo-no{ background:var(--danger-dim); color:var(--danger); }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <header class="page-head">
+    <div>
+      <h1>Entradas</h1>
+      <p>Renda fixa e trabalhos freelance do mês</p>
+    </div>
+    <div id="month-picker-mount"></div>
+  </header>
+
+  <div class="action-row">
+    <button class="btn btn-primary" id="btn-add-freela"><span data-icon="plus"></span>Adicionar Freela</button>
+    <button class="btn btn-outline" id="btn-manage-fixas"><span data-icon="settings"></span>Gerenciar Entradas Fixas</button>
+  </div>
+
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="kpi-card accent">
+      <div class="kpi-top"><span class="kpi-label">Renda Fixa</span><div class="kpi-icon" data-icon="briefcase"></div></div>
+      <div class="kpi-value" id="kpi-fixa">R$ 0,00</div>
+      <div class="kpi-sub" id="kpi-fixa-sub">0 lançamentos</div>
+    </div>
+    <div class="kpi-card olive">
+      <div class="kpi-top"><span class="kpi-label">Freelas</span><div class="kpi-icon" data-icon="bolt"></div></div>
+      <div class="kpi-value" id="kpi-freela">R$ 0,00</div>
+      <div class="kpi-sub" id="kpi-freela-sub">0 lançamentos</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Recebido</span><div class="kpi-icon" data-icon="income"></div></div>
+      <div class="kpi-value" id="kpi-total">R$ 0,00</div>
+      <div class="kpi-sub">renda fixa + freelas</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><span data-icon="briefcase"></span><span>Renda Fixa</span></div></div>
+      <div class="list" id="list-fixas"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><span data-icon="bolt"></span><span>Freelas &amp; Extras</span></div></div>
+      <div class="list" id="list-freela"></div>
+    </section>
+  </div>
+</main>
+
+<!-- MODAL: Adicionar/Editar Freela -->
+<div class="modal-overlay" id="modal-freela">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-freela-title">
+    <div class="modal-head"><span data-icon="bolt"></span><h2 id="modal-freela-title">Novo Freela</h2></div>
+    <div class="field-row">
+      <div class="field"><label for="f-data">Data</label><input type="date" id="f-data"></div>
+      <div class="field"><label for="f-valor">Valor (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
+    </div>
+    <div class="field"><label for="f-origem">Origem / Cliente</label><input type="text" id="f-origem" placeholder="Ex: Anglo Marketing"></div>
+    <div class="field"><label for="f-servico">Serviço prestado</label><input type="text" id="f-servico" placeholder="Ex: Edição de Vídeo"></div>
+    <div class="field-row">
+      <div class="field">
+        <label for="f-dizimo">Dízimo pago?</label>
+        <select id="f-dizimo"><option value="nao">Não</option><option value="sim">Sim</option></select>
+      </div>
+      <div class="field"><label for="f-who">Quem registrou?</label><select id="f-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-freela-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-freela-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Gerenciar Entradas Fixas -->
+<div class="modal-overlay" id="modal-fixas-entrada">
+  <div class="modal" style="width:480px;" role="dialog" aria-modal="true" aria-labelledby="modal-fixas-entrada-title">
+    <div class="modal-head"><span data-icon="settings"></span><h2 id="modal-fixas-entrada-title">Gerenciar Entradas Fixas</h2></div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Ex: salário CLT. Elas entram automaticamente todo mês.</p>
+    <div id="fixas-entrada-list" style="max-height:260px;overflow-y:auto;margin-bottom:16px;"></div>
+    <div style="border-top:1px solid var(--border-soft);padding-top:14px;">
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px;">Adicionar nova entrada fixa</p>
+      <div class="field"><label for="nf-origem">Origem</label><input type="text" id="nf-origem" placeholder="Ex: Empresa XPTO Ltda"></div>
+      <div class="field-row">
+        <div class="field"><label for="nf-val">Valor (R$)</label><input type="number" id="nf-val" step="0.01" placeholder="0,00"></div>
+        <div class="field"><label for="nf-dia">Dia de recebimento</label><input type="number" id="nf-dia" min="1" max="31" placeholder="5"></div>
+      </div>
+      <div class="field"><label for="nf-who">Quem recebe?</label><select id="nf-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select></div>
+      <button class="btn btn-primary btn-block" id="btn-add-fixa-entrada" style="margin-top:6px;"><span data-icon="plus"></span>Adicionar Entrada Fixa</button>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="modal-fixas-entrada-close">Fechar</button></div>
+  </div>
+</div>
+
+<script type="module">
+import { mountIcons, iconHtml } from './shared/icons.js';
+import { renderNav } from './shared/nav.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import {
+  db, ref, onValue, push, remove, update,
+  brl, sum, sortByDate,
+  getSavedMonth, subscribeMonth, subscribeEntradasTemplate, seedEntradasFromTemplate
+} from './shared/firebase.js';
+
+renderNav('entradas.html');
+mountLoadingScreen();
+mountSyncBadge();
+mountToast();
+mountIcons();
+
+let currentMonth = getSavedMonth();
+document.getElementById('month-picker-mount').innerHTML = monthPickerHtml(currentMonth);
+mountIcons();
+bindMonthPicker(m => { currentMonth = m; boot(); });
+
+let localData = {};
+let entradasTemplate = [];
+let unsubscribe = null;
+let editingKey = null;
+
+function boot(){
+  if(unsubscribe) unsubscribe();
+  localData = {};
+  document.getElementById('loading-screen') || mountLoadingScreen();
+  unsubscribe = subscribeMonth(currentMonth, (cat, arr)=>{ localData[cat] = arr; }, ()=>{
+    hideLoadingScreen();
+    setSyncStatus('online','Sincronizado');
+    renderAll();
+  });
+  if(entradasTemplate.length) seedEntradasFromTemplate(currentMonth, entradasTemplate);
+}
+subscribeEntradasTemplate(arr=>{
+  entradasTemplate = arr;
+  seedEntradasFromTemplate(currentMonth, entradasTemplate);
+});
+
+function dizimoRow(item){
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  const dv = item.dizimo === true;
+  return `
+    <div class="list-row">
+      <div class="list-date">${item.data||'—'}</div>
+      <div class="list-main"><strong>${item.origem||'—'}</strong><span>${item.servico||''}</span></div>
+      <div class="list-tags">
+        <button class="dizimo-pill ${dv?'dizimo-yes':'dizimo-no'}" data-toggle-dizimo="${item._key}:${dv}">Dízimo: ${dv?'Sim':'Não'}</button>
+        ${who}
+      </div>
+      <div class="list-value pos">+${brl(item.valor)}</div>
+      <div class="list-actions">
+        <button class="icon-btn" data-edit="${item.isFixa?'fixaentrada':'freela'}:${item._key}">${iconHtml('edit')}</button>
+        <button class="icon-btn del" data-del="entradas:${item._key}">${iconHtml('trash')}</button>
+      </div>
+    </div>`;
+}
+function freelaRow(item){
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  return `
+    <div class="list-row">
+      <div class="list-date">${item.data||'—'}</div>
+      <div class="list-main"><strong>${item.origem||'—'}</strong><span>${item.servico||''}</span></div>
+      <div class="list-tags">${who}</div>
+      <div class="list-value pos">+${brl(item.valor)}</div>
+      <div class="list-actions">
+        <button class="icon-btn" data-edit="freela:${item._key}">${iconHtml('edit')}</button>
+        <button class="icon-btn del" data-del="entradasFreela:${item._key}">${iconHtml('trash')}</button>
+      </div>
+    </div>`;
+}
+
+function renderAll(){
+  const entradasFixas = (localData.entradas||[]);
+  const freelas = (localData.entradasFreela||[]);
+
+  const listFixasEl = document.getElementById('list-fixas');
+  const sortedFixas = sortByDate(entradasFixas);
+  listFixasEl.innerHTML = sortedFixas.length ? sortedFixas.map(dizimoRow).join('') : `<div class="list-empty">Nenhuma entrada fixa este mês. Cadastre em "Gerenciar Entradas Fixas".</div>`;
+  mountIcons(listFixasEl);
+
+  const listFreelaEl = document.getElementById('list-freela');
+  const sortedFreelas = sortByDate(freelas);
+  listFreelaEl.innerHTML = sortedFreelas.length ? sortedFreelas.map(freelaRow).join('') : `<div class="list-empty">Nenhum freela registrado ainda.</div>`;
+  mountIcons(listFreelaEl);
+
+  const tFixa = sum(entradasFixas);
+  const tFreela = sum(freelas);
+  document.getElementById('kpi-fixa').textContent = brl(tFixa);
+  document.getElementById('kpi-fixa-sub').textContent = `${entradasFixas.length} lançamento${entradasFixas.length!==1?'s':''}`;
+  document.getElementById('kpi-freela').textContent = brl(tFreela);
+  document.getElementById('kpi-freela-sub').textContent = `${freelas.length} lançamento${freelas.length!==1?'s':''}`;
+  document.getElementById('kpi-total').textContent = brl(tFixa+tFreela);
+}
+
+// ── Delegated clicks ──
+document.addEventListener('click', e=>{
+  const delBtn = e.target.closest('[data-del]');
+  if(delBtn){
+    const [cat,key] = delBtn.dataset.del.split(':');
+    remove(ref(db, `meses/${currentMonth}/${cat}/${key}`));
+    showToast('Item removido','error');
+    return;
+  }
+  const editBtn = e.target.closest('[data-edit]');
+  if(editBtn){
+    const [type,key] = editBtn.dataset.edit.split(':');
+    openEditFreela(type, key);
+    return;
+  }
+  const dizimoBtn = e.target.closest('[data-toggle-dizimo]');
+  if(dizimoBtn){
+    const [key, curr] = dizimoBtn.dataset.toggleDizimo.split(':');
+    const current = curr === 'true';
+    const newVal = !current;
+    update(ref(db, `meses/${currentMonth}/entradas/${key}`), { dizimo:newVal });
+    const entry = (localData.entradas||[]).find(e=>e._key===key);
+    if(entry){
+      const dizimoVal = parseFloat(entry.valor||0) * 0.10;
+      const existingDizimo = (localData.fixas||[]).find(f=>f.dizimoEntradaKey===key);
+      if(existingDizimo) remove(ref(db, `meses/${currentMonth}/fixas/${existingDizimo._key}`));
+      if(newVal){
+        push(ref(db, `meses/${currentMonth}/fixas`), {
+          data:'', desc:'Dízimo — '+(entry.origem||entry.servico||'Entrada'),
+          valor:dizimoVal, pago:true, who:entry.who||'dudu',
+          dizimoEntradaKey:key, isAutoDizimo:true
+        });
+        showToast('Dízimo de '+brl(dizimoVal)+' registrado nas Contas Obrigatórias');
+      } else {
+        showToast('Dízimo removido das Contas Obrigatórias');
+      }
+    }
+    return;
+  }
+});
+
+// ── MODAL: Freela add/edit ──
+const modalFreela = document.getElementById('modal-freela');
+document.getElementById('btn-add-freela').addEventListener('click', ()=>{
+  editingKey = null;
+  document.getElementById('modal-freela-title').textContent = 'Novo Freela';
+  document.getElementById('f-data').value=''; document.getElementById('f-valor').value='';
+  document.getElementById('f-origem').value=''; document.getElementById('f-servico').value='';
+  document.getElementById('f-dizimo').value='nao'; document.getElementById('f-who').value='dudu';
+  openModal(modalFreela);
+});
+document.getElementById('modal-freela-cancel').addEventListener('click', ()=> closeModal(modalFreela));
+modalFreela.addEventListener('click', e=>{ if(e.target===modalFreela) closeModal(modalFreela); });
+
+let editingIsFixa = false;
+function openEditFreela(type, key){
+  editingIsFixa = type === 'fixaentrada';
+  const arr = editingIsFixa ? (localData.entradas||[]) : (localData.entradasFreela||[]);
+  const item = arr.find(i=>i._key===key);
+  if(!item) return;
+  editingKey = key;
+  document.getElementById('modal-freela-title').textContent = editingIsFixa ? 'Editar Entrada Fixa' : 'Editar Freela';
+  document.getElementById('f-data').value = ddmmToISOLocal(item.data);
+  document.getElementById('f-valor').value = item.valor;
+  document.getElementById('f-origem').value = item.origem||'';
+  document.getElementById('f-servico').value = item.servico||'';
+  document.getElementById('f-dizimo').value = item.dizimo ? 'sim':'nao';
+  document.getElementById('f-who').value = item.who||'dudu';
+  openModal(modalFreela);
+}
+function ddmmToISOLocal(ddmm){
+  if(!ddmm) return '';
+  const [dd,mm] = ddmm.split('/');
+  if(!dd||!mm) return '';
+  return `${currentMonth.split('-')[0]}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+}
+function isoToDDMMLocal(iso){
+  if(!iso) return '';
+  const [,mm,dd] = iso.split('-');
+  return `${dd}/${mm}`;
+}
+
+document.getElementById('modal-freela-save').addEventListener('click', ()=>{
+  const valor = parseFloat(document.getElementById('f-valor').value)||0;
+  if(valor<=0){ showToast('Informe um valor válido','error'); return; }
+  const payload = {
+    data: isoToDDMMLocal(document.getElementById('f-data').value),
+    origem: document.getElementById('f-origem').value||'',
+    servico: document.getElementById('f-servico').value||'',
+    valor,
+    dizimo: document.getElementById('f-dizimo').value==='sim',
+    who: document.getElementById('f-who').value,
+  };
+  if(editingKey){
+    const targetCat = editingIsFixa ? 'entradas' : 'entradasFreela';
+    update(ref(db, `meses/${currentMonth}/${targetCat}/${editingKey}`), payload);
+    showToast('Alterações salvas');
+  } else {
+    push(ref(db, `meses/${currentMonth}/entradasFreela`), payload);
+    showToast('Freela adicionado');
+  }
+  closeModal(modalFreela);
+});
+
+// ── MODAL: Gerenciar Entradas Fixas ──
+const modalFixasEntrada = document.getElementById('modal-fixas-entrada');
+document.getElementById('btn-manage-fixas').addEventListener('click', ()=>{
+  renderFixasEntradaList();
+  openModal(modalFixasEntrada);
+});
+document.getElementById('modal-fixas-entrada-close').addEventListener('click', ()=> closeModal(modalFixasEntrada));
+modalFixasEntrada.addEventListener('click', e=>{ if(e.target===modalFixasEntrada) closeModal(modalFixasEntrada); });
+
+function renderFixasEntradaList(){
+  const el = document.getElementById('fixas-entrada-list');
+  if(!entradasTemplate.length){
+    el.innerHTML = `<div class="list-empty">Nenhuma entrada fixa cadastrada ainda.</div>`;
+    return;
+  }
+  el.innerHTML = entradasTemplate.map(t=>`
+    <div class="manage-row">
+      <span class="mname">${t.origem||''} <span style="color:var(--text-muted);font-weight:400;">— dia ${t.dia||'—'}</span></span>
+      <span class="mval">${brl(t.valor)}</span>
+      <button class="icon-btn" data-edit-etpl="${t._key}">${iconHtml('edit')}</button>
+      <button class="icon-btn del" data-del-etpl="${t._key}">${iconHtml('trash')}</button>
+    </div>`).join('');
+  mountIcons(el);
+}
+
+document.getElementById('btn-add-fixa-entrada').addEventListener('click', ()=>{
+  const origem = document.getElementById('nf-origem').value.trim();
+  const val = parseFloat(document.getElementById('nf-val').value)||0;
+  const dia = parseInt(document.getElementById('nf-dia').value)||1;
+  const who = document.getElementById('nf-who').value;
+  if(!origem || val<=0){ showToast('Preencha origem e valor','error'); return; }
+
+  push(ref(db,'entradasTemplate'), { origem, valor:val, dia, who, servico:'Renda fixa' });
+
+  const mesStr = currentMonth.split('-')[1];
+  push(ref(db, `meses/${currentMonth}/entradas`), {
+    data: String(dia).padStart(2,'0')+'/'+mesStr,
+    origem, servico:'Renda fixa', valor:val, dizimo:false, who, isFixa:true
+  });
+
+  document.getElementById('nf-origem').value='';
+  document.getElementById('nf-val').value='';
+  document.getElementById('nf-dia').value='';
+  showToast('Entrada fixa adicionada');
+  setTimeout(renderFixasEntradaList, 350);
+});
+
+document.addEventListener('click', e=>{
+  const delTpl = e.target.closest('[data-del-etpl]');
+  if(delTpl){
+    const key = delTpl.dataset.delEtpl;
+    const t = entradasTemplate.find(i=>i._key===key);
+    if(!confirm('Remover esta entrada fixa do template?')) return;
+    remove(ref(db, `entradasTemplate/${key}`));
+    if(t){
+      const match = (localData.entradas||[]).find(f=>f.origem===t.origem && f.isFixa);
+      if(match) remove(ref(db, `meses/${currentMonth}/entradas/${match._key}`));
+    }
+    setTimeout(renderFixasEntradaList, 350);
+    return;
+  }
+  const editTpl = e.target.closest('[data-edit-etpl]');
+  if(editTpl){
+    const key = editTpl.dataset.editEtpl;
+    const t = entradasTemplate.find(i=>i._key===key);
+    if(!t) return;
+    const origem = prompt('Origem:', t.origem||''); if(origem===null) return;
+    const val = parseFloat(prompt('Valor:', t.valor||0)); if(isNaN(val)) return;
+    const dia = parseInt(prompt('Dia de recebimento:', t.dia||1)); if(isNaN(dia)) return;
+    update(ref(db, `entradasTemplate/${key}`), { origem, valor:val, dia });
+    showToast('Entrada atualizada');
+    setTimeout(renderFixasEntradaList, 350);
+  }
+});
+
+// ── Modal helpers ──
+function openModal(el){ el.classList.add('open'); }
+function closeModal(el){ el.classList.remove('open'); }
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ [modalFreela, modalFixasEntrada].forEach(closeModal); }
+});
+
+window.addEventListener('online', ()=>{ setSyncStatus('syncing','Reconectando…'); boot(); });
+window.addEventListener('offline', ()=> setSyncStatus('offline','Sem conexão'));
+
+boot();
+</script>
+</body>
+</html>

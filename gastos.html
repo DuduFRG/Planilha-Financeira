@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Gastos — Dudu &amp; Beli</title>
+<meta name="description" content="Gastos por categoria de Dudu e Beli.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#020126">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+  .cat-panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .cat-panel-title{ display:flex; align-items:center; gap:10px; font-family:var(--font-display); font-weight:700; font-size:13.5px; }
+  .cat-panel-title .dot-ic{ width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center; }
+  .cat-panel-title .dot-ic svg{ width:15px;height:15px; }
+  .cat-total{ font-family:var(--font-display); font-weight:700; font-size:13px; padding-top:10px; margin-top:8px; border-top:1px solid var(--border-soft); display:flex; justify-content:space-between; }
+  .upload-zone{ border:2px dashed var(--border); border-radius:var(--radius-md); padding:26px; text-align:center; cursor:pointer; position:relative; transition:border-color .2s; }
+  .upload-zone:hover{ border-color:var(--acid); }
+  .upload-zone input{ position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .upload-zone svg{ color:var(--text-muted); margin-bottom:8px; }
+  .upload-zone p{ font-size:12px; color:var(--text-muted); }
+  .upload-name{ font-size:12px; color:var(--acid); margin-top:8px; font-weight:600; }
+  .thinking{ display:none; text-align:center; padding:18px; }
+  .thinking.show{ display:block; }
+  .indef-card{ background:var(--surface-3); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; display:flex; flex-direction:column; gap:9px; margin-bottom:10px; }
+  .indef-card:last-child{ margin-bottom:0; }
+  .indef-top{ display:flex; justify-content:space-between; align-items:center; }
+  .indef-val{ font-family:var(--font-display); font-weight:700; color:var(--danger); }
+  .indef-date{ font-size:11px; color:var(--text-muted); }
+  .manage-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft); }
+  .manage-row:last-child{ border-bottom:none; }
+  .manage-row .mname{ flex:1; font-size:12.5px; font-weight:500; }
+  .manage-row .mval{ font-size:12px; color:var(--danger); font-weight:600; min-width:78px; text-align:right; }
+  .manage-row .mday{ font-size:11px; color:var(--text-muted); min-width:36px; }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <header class="page-head">
+    <div>
+      <h1>Gastos</h1>
+      <p>Contas obrigatórias e categorias do mês</p>
+    </div>
+    <div id="month-picker-mount"></div>
+  </header>
+
+  <div class="action-row">
+    <button class="btn btn-primary" id="btn-add-gasto"><span data-icon="plus"></span>Adicionar Gasto</button>
+    <button class="btn btn-outline" id="btn-manage-fixas"><span data-icon="settings"></span>Gerenciar Contas Obrigatórias</button>
+    <button class="btn btn-outline" id="btn-extrato"><span data-icon="upload"></span>Importar Extrato</button>
+  </div>
+
+  <div class="grid-cats">
+    <!-- CONTAS OBRIGATÓRIAS -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#4C8DFF22;"><span data-icon="shieldCheck" data-icon-class="icon" style="color:#4C8DFF"></span></div>Contas Obrigatórias</div>
+      </div>
+      <div class="list" id="list-fixas"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-fixas">R$ 0,00</span></div>
+    </section>
+
+    <!-- IMPREVISTOS -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#e5484d22;"><span data-icon="bolt" style="color:#e5484d"></span></div>Imprevistos</div>
+      </div>
+      <div class="list" id="list-imprevistos"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-imprevistos">R$ 0,00</span></div>
+    </section>
+
+    <!-- ALIMENTAÇÃO -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#f2994a22;"><span data-icon="utensils" style="color:#f2994a"></span></div>Alimentação</div>
+      </div>
+      <div class="list" id="list-alimentacao"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-alimentacao">R$ 0,00</span></div>
+    </section>
+
+    <!-- LAZER -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#a179f222;"><span data-icon="gamepad" style="color:#a179f2"></span></div>Lazer</div>
+      </div>
+      <div class="list" id="list-lazer"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-lazer">R$ 0,00</span></div>
+    </section>
+
+    <!-- TRANSPORTE -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#3fbf8822;"><span data-icon="car" style="color:#3fbf88"></span></div>Transporte</div>
+      </div>
+      <div class="list" id="list-transporte"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-transporte">R$ 0,00</span></div>
+    </section>
+
+    <!-- CASA -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#bbbf4922;"><span data-icon="home" style="color:#bbbf49"></span></div>Casa</div>
+      </div>
+      <div class="list" id="list-casa"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-casa">R$ 0,00</span></div>
+    </section>
+
+    <!-- INVESTIMENTOS -->
+    <section class="panel">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#4ecbd922;"><span data-icon="trendUp" style="color:#4ecbd9"></span></div>Investimentos</div>
+      </div>
+      <div class="list" id="list-investimentos"></div>
+      <div class="cat-total"><span style="color:var(--text-muted);font-weight:500;">Total</span><span id="total-investimentos">R$ 0,00</span></div>
+    </section>
+
+    <!-- INDEFINIDOS (só aparece quando houver) -->
+    <section class="panel" id="panel-indefinidos" style="display:none;">
+      <div class="cat-panel-head">
+        <div class="cat-panel-title"><div class="dot-ic" style="background:#73737322;"><span data-icon="inbox" style="color:#737373"></span></div>Indefinidos <span class="tag tag-pay" id="indef-count">0</span></div>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:10px;">Itens importados do extrato. Edite o nome e selecione a categoria.</p>
+      <div id="indef-list"></div>
+    </section>
+  </div>
+</main>
+
+<!-- MODAL: Adicionar/Editar Gasto -->
+<div class="modal-overlay" id="modal-gasto">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-gasto-title">
+    <div class="modal-head"><span data-icon="expense"></span><h2 id="modal-gasto-title">Novo Gasto</h2></div>
+    <div class="field">
+      <label for="f-cat">Categoria</label>
+      <select id="f-cat"></select>
+    </div>
+    <div class="field-row">
+      <div class="field"><label for="f-data">Data</label><input type="date" id="f-data"></div>
+      <div class="field"><label for="f-valor">Valor (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
+    </div>
+    <div class="field"><label for="f-desc">Descrição</label><input type="text" id="f-desc" placeholder="Descreva o gasto"></div>
+    <div class="field-row">
+      <div class="field"><label for="f-pagamento">Forma de Pagamento</label><select id="f-pagamento"></select></div>
+      <div class="field"><label for="f-who">Quem registrou?</label><select id="f-who"><option value="dudu">Dudu</option><option value="beli">Beli</option></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-gasto-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-gasto-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Gerenciar Contas Obrigatórias -->
+<div class="modal-overlay" id="modal-fixas">
+  <div class="modal" style="width:480px;" role="dialog" aria-modal="true" aria-labelledby="modal-fixas-title">
+    <div class="modal-head"><span data-icon="settings"></span><h2 id="modal-fixas-title">Gerenciar Contas Obrigatórias</h2></div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Estas contas aparecem automaticamente todo mês como pendentes.</p>
+    <div id="fixas-template-list" style="max-height:280px;overflow-y:auto;margin-bottom:16px;"></div>
+    <div style="border-top:1px solid var(--border-soft);padding-top:14px;">
+      <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px;">Adicionar nova conta fixa</p>
+      <div class="field"><label for="nf-nome">Nome</label><input type="text" id="nf-nome" placeholder="Ex: Netflix"></div>
+      <div class="field-row">
+        <div class="field"><label for="nf-val">Valor (R$)</label><input type="number" id="nf-val" step="0.01" placeholder="0,00"></div>
+        <div class="field"><label for="nf-dia">Dia de vencimento</label><input type="number" id="nf-dia" min="1" max="31" placeholder="10"></div>
+      </div>
+      <div class="checkbox-field"><input type="checkbox" id="nf-indef"><label for="nf-indef">Valor indefinido (ex: fatura de cartão de crédito)</label></div>
+      <button class="btn btn-primary btn-block" id="btn-add-fixa-template" style="margin-top:14px;"><span data-icon="plus"></span>Adicionar Conta</button>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="modal-fixas-close">Fechar</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Importar Extrato -->
+<div class="modal-overlay" id="modal-extrato">
+  <div class="modal" style="width:460px;" role="dialog" aria-modal="true" aria-labelledby="modal-extrato-title">
+    <div class="modal-head"><span data-icon="fileText"></span><h2 id="modal-extrato-title">Importar Extrato Bancário</h2></div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Envie um print ou PDF do extrato. A IA lê e lista os gastos automaticamente.</p>
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="extrato-file" accept="image/*,.pdf">
+      <div data-icon="upload" data-icon-class="icon icon-lg"></div>
+      <p>Clique ou arraste seu extrato aqui</p>
+      <p style="font-size:11px;">JPG, PNG ou PDF</p>
+      <div class="upload-name" id="upload-name"></div>
+    </div>
+    <div class="thinking" id="thinking">
+      <div class="spinner" style="margin:0 auto 10px;"></div>
+      <p style="font-size:12px;color:var(--acid);font-weight:600;">Lendo o extrato…</p>
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="api-key">Chave API Anthropic</label>
+      <input type="password" id="api-key" placeholder="sk-ant-...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="modal-extrato-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-process-extrato"><span data-icon="bolt"></span>Analisar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { mountIcons, iconHtml } from './shared/icons.js';
+import { renderNav } from './shared/nav.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import {
+  db, ref, onValue, push, remove, update, get,
+  CAT_META, PAGAMENTO_OPTIONS, brl, sum, sortByDate,
+  getSavedMonth, subscribeMonth, subscribeFixasTemplate, seedFixasFromTemplate
+} from './shared/firebase.js';
+
+renderNav('gastos.html');
+mountLoadingScreen();
+mountSyncBadge();
+mountToast();
+mountIcons();
+
+let currentMonth = getSavedMonth();
+document.getElementById('month-picker-mount').innerHTML = monthPickerHtml(currentMonth);
+mountIcons();
+bindMonthPicker(m => { currentMonth = m; boot(); });
+
+let localData = {};
+let fixasTemplate = [];
+let unsubscribe = null;
+let editingKey = null;
+let editingCat = null;
+
+const CAT_ORDER = ['fixas','imprevistos','alimentacao','lazer','transporte','casa','investimentos'];
+
+function pagamentoTag(item){
+  if(!item.pagamento) return '';
+  const opt = PAGAMENTO_OPTIONS.find(p=>p.value===item.pagamento);
+  if(!opt) return '';
+  return `<span class="tag tag-pay">${iconHtml(opt.icon)}${opt.label}</span>`;
+}
+
+// ── Populate selects ──
+function fillCatSelect(){
+  const sel = document.getElementById('f-cat');
+  sel.innerHTML = CAT_ORDER.map(k=>`<option value="${k}">${CAT_META[k].label}</option>`).join('');
+}
+function fillPagamentoSelect(selected=''){
+  const sel = document.getElementById('f-pagamento');
+  sel.innerHTML = `<option value="">— Não informado —</option>` + PAGAMENTO_OPTIONS.map(p=>`<option value="${p.value}" ${p.value===selected?'selected':''}>${p.label}</option>`).join('');
+}
+fillCatSelect();
+fillPagamentoSelect();
+
+function boot(){
+  if(unsubscribe) unsubscribe();
+  localData = {};
+  document.getElementById('loading-screen') || mountLoadingScreen();
+  unsubscribe = subscribeMonth(currentMonth, (cat, arr)=>{ localData[cat] = arr; }, ()=>{
+    hideLoadingScreen();
+    setSyncStatus('online','Sincronizado');
+    renderAll();
+  });
+  if(fixasTemplate.length) seedFixasFromTemplate(currentMonth, fixasTemplate);
+}
+
+subscribeFixasTemplate(arr=>{
+  fixasTemplate = arr;
+  seedFixasFromTemplate(currentMonth, fixasTemplate);
+});
+
+function renderList(containerId, arr, cat, extraRender){
+  const el = document.getElementById(containerId);
+  const items = sortByDate(arr);
+  if(!items.length){
+    el.innerHTML = `<div class="list-empty">Nenhum lançamento ainda.</div>`;
+    return;
+  }
+  el.innerHTML = items.map(item => extraRender ? extraRender(item) : defaultRow(item, cat)).join('');
+  mountIcons(el);
+}
+
+function defaultRow(item, cat){
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  return `
+    <div class="list-row">
+      <div class="list-date">${item.data||'—'}</div>
+      <div class="list-main"><strong>${item.desc||''}</strong></div>
+      <div class="list-tags">${who}${pagamentoTag(item)}</div>
+      <div class="list-value neg">${brl(item.valor)}</div>
+      <div class="list-actions">
+        <button class="icon-btn" data-edit="${cat}:${item._key}">${iconHtml('edit')}</button>
+        <button class="icon-btn del" data-del="${cat}:${item._key}">${iconHtml('trash')}</button>
+      </div>
+    </div>`;
+}
+
+function fixaRow(item){
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  const pago = item.pago === true;
+  const valDisplay = (item.valorIndefinido && !pago) ? `<span style="color:var(--text-muted);font-size:12px;">A definir</span>` : brl(item.valor);
+  return `
+    <div class="list-row">
+      <div class="list-date">${item.data||'—'}</div>
+      <div class="list-main"><strong>${item.desc||''}</strong></div>
+      <div class="list-tags">${who}${pagamentoTag(item)}</div>
+      <div class="list-value neg">${valDisplay}</div>
+      <div class="list-actions" style="opacity:1;">
+        <button class="pill-btn ${pago?'pill-paid':'pill-pending'}" data-toggle-pago="${item._key}:${pago}">
+          ${iconHtml(pago?'check':'clock')}${pago?'Pago':'Pendente'}
+        </button>
+        <button class="icon-btn" data-edit="fixas:${item._key}">${iconHtml('edit')}</button>
+        <button class="icon-btn del" data-del="fixas:${item._key}">${iconHtml('trash')}</button>
+      </div>
+    </div>`;
+}
+
+function renderAll(){
+  CAT_ORDER.forEach(cat=>{
+    if(cat==='fixas'){
+      renderList('list-fixas', localData.fixas||[], 'fixas', fixaRow);
+      const totalPago = sum((localData.fixas||[]).filter(f=>f.pago===true));
+      const totalPend = sum((localData.fixas||[]).filter(f=>f.pago!==true && !f.valorIndefinido));
+      document.getElementById('total-fixas').innerHTML = `${brl(totalPago)}${totalPend>0?` <span style="color:var(--text-muted);font-weight:500;font-size:11px;">(+${brl(totalPend)} pend.)</span>`:''}`;
+    } else {
+      renderList(`list-${cat}`, localData[cat]||[], cat);
+      document.getElementById(`total-${cat}`).textContent = brl(sum(localData[cat]||[]));
+    }
+  });
+  renderIndefinidos();
+}
+
+function renderIndefinidos(){
+  const arr = localData.indefinidos || [];
+  const panel = document.getElementById('panel-indefinidos');
+  const list = document.getElementById('indef-list');
+  document.getElementById('indef-count').textContent = arr.length;
+  if(!arr.length){ panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  const catOpts = CAT_ORDER.map(k=>`<option value="${k}">${CAT_META[k].label}</option>`).join('');
+  list.innerHTML = arr.map(item=>`
+    <div class="indef-card">
+      <div class="indef-top">
+        <span class="indef-val">${brl(item.valor)}</span>
+        <span class="indef-date">${item.data||'—'}</span>
+        <button class="icon-btn del" data-del="indefinidos:${item._key}">${iconHtml('trash')}</button>
+      </div>
+      <input type="text" id="iname-${item._key}" value="${item.desc||''}" placeholder="Nome do gasto"
+        style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:12.5px;">
+      <div style="display:flex;gap:8px;">
+        <select id="icat-${item._key}" style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:12.5px;">
+          <option value="">Selecionar categoria…</option>${catOpts}
+        </select>
+        <button class="btn btn-primary btn-sm" data-confirm-indef="${item._key}">Mover</button>
+      </div>
+    </div>
+  `).join('');
+  mountIcons(list);
+}
+
+// ── DELEGATED CLICK HANDLING ──
+document.addEventListener('click', (e)=>{
+  const editBtn = e.target.closest('[data-edit]');
+  if(editBtn){ openEditModal(editBtn.dataset.edit); return; }
+
+  const delBtn = e.target.closest('[data-del]');
+  if(delBtn){
+    const [cat,key] = delBtn.dataset.del.split(':');
+    remove(ref(db, `meses/${currentMonth}/${cat}/${key}`));
+    showToast('Item removido','error');
+    return;
+  }
+
+  const toggleBtn = e.target.closest('[data-toggle-pago]');
+  if(toggleBtn){
+    const [key, curr] = toggleBtn.dataset.togglePago.split(':');
+    const current = curr === 'true';
+    const item = (localData.fixas||[]).find(f=>f._key===key);
+    if(!current && item?.valorIndefinido){
+      const val = parseFloat(prompt('Qual o valor desta fatura?', ''));
+      if(isNaN(val) || val<=0){ showToast('Valor inválido','error'); return; }
+      update(ref(db, `meses/${currentMonth}/fixas/${key}`), { pago:true, valor:val });
+      showToast('Conta paga — '+brl(val));
+    } else {
+      update(ref(db, `meses/${currentMonth}/fixas/${key}`), { pago: !current });
+    }
+    return;
+  }
+
+  const confirmIndef = e.target.closest('[data-confirm-indef]');
+  if(confirmIndef){
+    const key = confirmIndef.dataset.confirmIndef;
+    const catSel = document.getElementById(`icat-${key}`);
+    if(!catSel?.value){ showToast('Selecione uma categoria','error'); return; }
+    const item = (localData.indefinidos||[]).find(i=>i._key===key);
+    if(!item) return;
+    const nameEl = document.getElementById(`iname-${key}`);
+    const newItem = { data:item.data||'', desc: nameEl?.value || item.desc || '', valor:item.valor, who:item.who||'dudu' };
+    if(catSel.value==='fixas') newItem.pago = false;
+    remove(ref(db, `meses/${currentMonth}/indefinidos/${key}`));
+    push(ref(db, `meses/${currentMonth}/${catSel.value}`), newItem);
+    showToast('Movido com sucesso');
+    return;
+  }
+});
+
+// ── MODAL: Adicionar/Editar Gasto ──
+const modalGasto = document.getElementById('modal-gasto');
+document.getElementById('btn-add-gasto').addEventListener('click', ()=> openAddModal());
+document.getElementById('modal-gasto-cancel').addEventListener('click', ()=> closeModal(modalGasto));
+modalGasto.addEventListener('click', e=>{ if(e.target===modalGasto) closeModal(modalGasto); });
+
+function openAddModal(){
+  editingKey = null; editingCat = null;
+  document.getElementById('modal-gasto-title').textContent = 'Novo Gasto';
+  document.getElementById('f-cat').value = 'fixas';
+  document.getElementById('f-data').value = '';
+  document.getElementById('f-valor').value = '';
+  document.getElementById('f-desc').value = '';
+  fillPagamentoSelect('');
+  document.getElementById('f-who').value = 'dudu';
+  openModal(modalGasto);
+}
+
+function openEditModal(key){
+  const [cat, itemKey] = key.split(':');
+  const item = (localData[cat]||[]).find(i=>i._key===itemKey);
+  if(!item) return;
+  editingKey = itemKey; editingCat = cat;
+  document.getElementById('modal-gasto-title').textContent = 'Editar Gasto';
+  document.getElementById('f-cat').value = cat;
+  document.getElementById('f-data').value = ddmmToISOLocal(item.data);
+  document.getElementById('f-valor').value = item.valor;
+  document.getElementById('f-desc').value = item.desc||'';
+  fillPagamentoSelect(item.pagamento||'');
+  document.getElementById('f-who').value = item.who||'dudu';
+  openModal(modalGasto);
+}
+
+function ddmmToISOLocal(ddmm){
+  if(!ddmm) return '';
+  const [dd,mm] = ddmm.split('/');
+  if(!dd||!mm) return '';
+  return `${currentMonth.split('-')[0]}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+}
+function isoToDDMMLocal(iso){
+  if(!iso) return '';
+  const [,mm,dd] = iso.split('-');
+  return `${dd}/${mm}`;
+}
+
+document.getElementById('modal-gasto-save').addEventListener('click', ()=>{
+  const valor = parseFloat(document.getElementById('f-valor').value)||0;
+  if(valor<=0){ showToast('Informe um valor válido','error'); return; }
+  const cat = document.getElementById('f-cat').value;
+  const data = isoToDDMMLocal(document.getElementById('f-data').value);
+  const desc = document.getElementById('f-desc').value||'';
+  const pagamento = document.getElementById('f-pagamento').value||'';
+  const who = document.getElementById('f-who').value;
+  const payload = { data, desc, valor, who };
+  if(pagamento) payload.pagamento = pagamento;
+  if(cat==='fixas' && editingKey===null) payload.pago = false;
+
+  if(editingKey){
+    if(cat !== editingCat){
+      if(editingCat==='fixas') payload.pago = false;
+      remove(ref(db, `meses/${currentMonth}/${editingCat}/${editingKey}`));
+      push(ref(db, `meses/${currentMonth}/${cat}`), payload);
+    } else {
+      if(editingCat==='fixas'){
+        const existing = (localData.fixas||[]).find(f=>f._key===editingKey);
+        payload.pago = existing?.pago || false;
+      }
+      update(ref(db, `meses/${currentMonth}/${editingCat}/${editingKey}`), payload);
+    }
+    showToast('Alterações salvas');
+  } else {
+    push(ref(db, `meses/${currentMonth}/${cat}`), payload);
+    showToast('Gasto adicionado');
+  }
+  closeModal(modalGasto);
+});
+
+// ── MODAL: Gerenciar Contas Fixas ──
+const modalFixas = document.getElementById('modal-fixas');
+document.getElementById('btn-manage-fixas').addEventListener('click', ()=>{
+  renderFixasTemplateList();
+  openModal(modalFixas);
+});
+document.getElementById('modal-fixas-close').addEventListener('click', ()=> closeModal(modalFixas));
+modalFixas.addEventListener('click', e=>{ if(e.target===modalFixas) closeModal(modalFixas); });
+
+function renderFixasTemplateList(){
+  const el = document.getElementById('fixas-template-list');
+  if(!fixasTemplate.length){
+    el.innerHTML = `<div class="list-empty">Nenhuma conta fixa cadastrada ainda.</div>`;
+    return;
+  }
+  el.innerHTML = fixasTemplate.map(t=>`
+    <div class="manage-row">
+      <span class="mday">Dia ${t.dia||'—'}</span>
+      <span class="mname">${t.nome||''}</span>
+      <span class="mval">${t.valorIndefinido ? 'Variável' : brl(t.valor)}</span>
+      <button class="icon-btn" data-edit-tpl="${t._key}">${iconHtml('edit')}</button>
+      <button class="icon-btn del" data-del-tpl="${t._key}">${iconHtml('trash')}</button>
+    </div>`).join('');
+  mountIcons(el);
+}
+
+document.getElementById('btn-add-fixa-template').addEventListener('click', ()=>{
+  const nome = document.getElementById('nf-nome').value.trim();
+  const val = parseFloat(document.getElementById('nf-val').value)||0;
+  const dia = parseInt(document.getElementById('nf-dia').value)||1;
+  const indef = document.getElementById('nf-indef').checked;
+  if(!nome){ showToast('Informe o nome','error'); return; }
+  if(!indef && val<=0){ showToast('Informe o valor ou marque Indefinido','error'); return; }
+
+  push(ref(db,'fixasTemplate'), { nome, valor: indef?0:val, dia, valorIndefinido: indef });
+
+  const mesStr = currentMonth.split('-')[1];
+  push(ref(db, `meses/${currentMonth}/fixas`), {
+    data: String(dia).padStart(2,'0')+'/'+mesStr,
+    desc: nome + (indef ? ' (valor a definir)' : ''),
+    valor: indef?0:val,
+    pago: false,
+    who: 'dudu',
+    valorIndefinido: indef
+  });
+
+  document.getElementById('nf-nome').value='';
+  document.getElementById('nf-val').value='';
+  document.getElementById('nf-dia').value='';
+  document.getElementById('nf-indef').checked=false;
+  showToast('Conta adicionada');
+  setTimeout(renderFixasTemplateList, 350);
+});
+
+document.addEventListener('click', e=>{
+  const delTpl = e.target.closest('[data-del-tpl]');
+  if(delTpl){
+    const key = delTpl.dataset.delTpl;
+    const t = fixasTemplate.find(i=>i._key===key);
+    if(!confirm('Remover esta conta fixa do template?')) return;
+    remove(ref(db, `fixasTemplate/${key}`));
+    if(t){
+      const match = (localData.fixas||[]).find(f=>f.desc===t.nome && f.pago===false);
+      if(match) remove(ref(db, `meses/${currentMonth}/fixas/${match._key}`));
+    }
+    setTimeout(renderFixasTemplateList, 350);
+    return;
+  }
+  const editTpl = e.target.closest('[data-edit-tpl]');
+  if(editTpl){
+    const key = editTpl.dataset.editTpl;
+    const t = fixasTemplate.find(i=>i._key===key);
+    if(!t) return;
+    const nome = prompt('Nome:', t.nome||''); if(nome===null) return;
+    const val = parseFloat(prompt('Valor:', t.valor||0)); if(isNaN(val)) return;
+    const dia = parseInt(prompt('Dia de vencimento:', t.dia||1)); if(isNaN(dia)) return;
+    update(ref(db, `fixasTemplate/${key}`), { nome, valor:val, dia });
+    showToast('Conta atualizada');
+    setTimeout(renderFixasTemplateList, 350);
+  }
+});
+
+// ── MODAL: Importar Extrato ──
+const modalExtrato = document.getElementById('modal-extrato');
+let extratoData = null, extratoType = null;
+document.getElementById('btn-extrato').addEventListener('click', ()=> openModal(modalExtrato));
+document.getElementById('modal-extrato-cancel').addEventListener('click', ()=> closeModal(modalExtrato));
+modalExtrato.addEventListener('click', e=>{ if(e.target===modalExtrato) closeModal(modalExtrato); });
+
+document.getElementById('extrato-file').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  document.getElementById('upload-name').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = ev=>{ extratoData = ev.target.result.split(',')[1]; extratoType = file.type; };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('btn-process-extrato').addEventListener('click', async ()=>{
+  if(!extratoData){ showToast('Selecione um arquivo','error'); return; }
+  const apiKey = document.getElementById('api-key').value.trim();
+  if(!apiKey){ showToast('Insira sua chave API','error'); return; }
+  document.getElementById('thinking').classList.add('show');
+  const mediaType = extratoType==='application/pdf' ? 'application/pdf' : (extratoType||'image/jpeg');
+  const prompt_text = 'Analise este extrato bancário. Liste APENAS os débitos/gastos/saídas (não incluir entradas/créditos). Para cada item retorne JSON array: [{data,desc,valor}] onde valor é número positivo. Retorne APENAS JSON puro sem markdown.';
+  const content = mediaType==='application/pdf'
+    ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:extratoData}},{type:'text',text:prompt_text}]
+    : [{type:'image',source:{type:'base64',media_type:mediaType,data:extratoData}},{type:'text',text:prompt_text}];
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:2000, messages:[{role:'user',content}] })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error?.message || 'Erro na API');
+    const text = data.content[0]?.text || '[]';
+    const items = JSON.parse(text.replace(/```json|```/g,'').trim());
+    if(!Array.isArray(items) || !items.length) throw new Error('Nenhum item encontrado');
+    items.forEach(item=>{
+      push(ref(db, `meses/${currentMonth}/indefinidos`), { data:item.data||'', desc:item.desc||'Sem descrição', valor:parseFloat(item.valor)||0, who:'dudu' });
+    });
+    showToast(`${items.length} gastos importados`);
+    closeModal(modalExtrato);
+  } catch(err){
+    showToast('Erro: '+err.message, 'error');
+  } finally {
+    document.getElementById('thinking').classList.remove('show');
+  }
+});
+
+// ── Modal helpers ──
+function openModal(el){ el.classList.add('open'); }
+function closeModal(el){ el.classList.remove('open'); }
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ [modalGasto,modalFixas,modalExtrato].forEach(closeModal); }
+});
+
+window.addEventListener('online', ()=>{ setSyncStatus('syncing','Reconectando…'); boot(); });
+window.addEventListener('offline', ()=> setSyncStatus('offline','Sem conexão'));
+
+boot();
+</script>
+</body>
+</html>

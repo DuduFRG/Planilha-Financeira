@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Visão Geral — Dudu &amp; Beli</title>
+<meta name="description" content="Painel financeiro compartilhado de Dudu e Beli.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#020126">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<link rel="stylesheet" href="shared/style.css">
+<style>
+  .chart-wrap{ position: relative; height: 240px; }
+  .split-summary{ display:flex; flex-direction:column; gap: 2px; }
+  .split-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 2px; border-bottom:1px solid var(--border-soft); font-size:12.5px; }
+  .split-row:last-child{ border-bottom:none; }
+  .split-row .who{ display:flex; align-items:center; gap:9px; color: var(--text-muted); }
+  .split-row .amt{ font-family: var(--font-display); font-weight:700; }
+  .pending-strip{ display:flex; align-items:center; gap:10px; padding:11px 14px; background: var(--olive-dim); border: 1px solid var(--olive-dim); border-radius: var(--radius-sm); margin-bottom: 16px; font-size:12.5px; color: var(--olive); }
+  .pending-strip svg{ stroke: var(--olive); flex-shrink:0; }
+  .pending-strip strong{ color: var(--text); }
+</style>
+</head>
+<body>
+
+<main class="main">
+  <header class="page-head">
+    <div>
+      <h1>Visão Geral</h1>
+      <p>Resumo financeiro em tempo real de Dudu &amp; Beli</p>
+    </div>
+    <div id="month-picker-mount"></div>
+  </header>
+
+  <div id="pending-alert"></div>
+
+  <!-- KPIs -->
+  <section class="kpi-grid" aria-label="Indicadores do mês">
+    <div class="kpi-card accent">
+      <div class="kpi-top">
+        <span class="kpi-label">Entradas</span>
+        <div class="kpi-icon" data-icon="income"></div>
+      </div>
+      <div class="kpi-value" id="kpi-entradas">R$ 0,00</div>
+      <div class="kpi-sub" id="kpi-entradas-sub">0 lançamentos</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kpi-top">
+        <span class="kpi-label">Total Gasto</span>
+        <div class="kpi-icon" data-icon="expense"></div>
+      </div>
+      <div class="kpi-value" id="kpi-gastos">R$ 0,00</div>
+      <div class="kpi-sub">apenas contas já pagas</div>
+    </div>
+    <div class="kpi-card olive">
+      <div class="kpi-top">
+        <span class="kpi-label">Saldo</span>
+        <div class="kpi-icon" data-icon="scale"></div>
+      </div>
+      <div class="kpi-value" id="kpi-saldo">R$ 0,00</div>
+      <div class="kpi-sub" id="kpi-saldo-sub">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top">
+        <span class="kpi-label">Pendente</span>
+        <div class="kpi-icon" data-icon="clock"></div>
+      </div>
+      <div class="kpi-value" id="kpi-pendente">R$ 0,00</div>
+      <div class="kpi-sub">contas a pagar este mês</div>
+    </div>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+        <div data-icon-wrap></div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-fluxo" role="img" aria-label="Gráfico de entradas e gastos por dia"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span data-icon="briefcase"></span><span>Quem trouxe quanto</span></div>
+      </div>
+      <div class="split-summary" id="split-summary"></div>
+    </section>
+  </div>
+
+  <div class="grid-2">
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span data-icon="pieChart"></span><span>Gastos por categoria</span></div>
+      </div>
+      <div id="catbar-list"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span data-icon="layers"></span><span>Últimos lançamentos</span></div>
+      </div>
+      <div class="list" id="recent-list"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import { mountIcons, iconHtml } from './shared/icons.js';
+import { renderNav } from './shared/nav.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import {
+  db, ref, onValue, CATEGORIES, CAT_META, brl, sum, sortByDate,
+  getSavedMonth, monthLabel, subscribeMonth
+} from './shared/firebase.js';
+
+renderNav('index.html');
+mountLoadingScreen();
+mountSyncBadge();
+mountToast();
+
+let currentMonth = getSavedMonth();
+document.getElementById('month-picker-mount').innerHTML = monthPickerHtml(currentMonth);
+mountIcons();
+bindMonthPicker(m => { currentMonth = m; boot(); });
+
+// Fix the placeholder panel title left from static markup
+document.querySelectorAll('[data-icon-wrap]').forEach(el=>{
+  el.outerHTML = `<div class="panel-title"><span data-icon="barChart"></span><span>Fluxo do mês (entradas x gastos por dia)</span></div>`;
+});
+mountIcons();
+
+let localData = {};
+let unsubscribe = null;
+let chart = null;
+
+function boot(){
+  if(unsubscribe) unsubscribe();
+  localData = {};
+  document.getElementById('loading-screen') || mountLoadingScreen();
+  unsubscribe = subscribeMonth(currentMonth, (cat, arr)=>{ localData[cat] = arr; }, ()=>{
+    hideLoadingScreen();
+    setSyncStatus('online','Sincronizado');
+    renderAll();
+  });
+}
+
+function renderAll(){
+  const entradas = localData.entradas||[];
+  const entradasFreela = localData.entradasFreela||[];
+  const allEntradas = [...entradas, ...entradasFreela];
+  const fixas = localData.fixas||[];
+  const fixasPagas = fixas.filter(f=>f.pago===true);
+  const fixasPendentes = fixas.filter(f=>f.pago!==true);
+
+  const gastosArr = [
+    ...fixasPagas,
+    ...(localData.imprevistos||[]),
+    ...(localData.alimentacao||[]),
+    ...(localData.lazer||[]),
+    ...(localData.transporte||[]),
+    ...(localData.casa||[]),
+    ...(localData.investimentos||[]),
+  ];
+
+  const tEntradas = sum(allEntradas);
+  const tGastos = sum(gastosArr);
+  const tPendente = sum(fixasPendentes.filter(f=>!f.valorIndefinido));
+  const saldo = tEntradas - tGastos;
+
+  document.getElementById('kpi-entradas').textContent = brl(tEntradas);
+  document.getElementById('kpi-entradas-sub').textContent = `${allEntradas.length} lançamento${allEntradas.length!==1?'s':''}`;
+  document.getElementById('kpi-gastos').textContent = brl(tGastos);
+  const saldoEl = document.getElementById('kpi-saldo');
+  saldoEl.textContent = brl(saldo);
+  document.getElementById('kpi-saldo-sub').textContent = tEntradas>0 ? `${((tGastos/tEntradas)*100).toFixed(0)}% do recebido gasto` : '—';
+  document.getElementById('kpi-pendente').textContent = brl(tPendente);
+
+  // Pending alert strip
+  const alertEl = document.getElementById('pending-alert');
+  if(fixasPendentes.length){
+    alertEl.innerHTML = `<div class="pending-strip">${iconHtml('clock')}<span><strong>${fixasPendentes.length}</strong> conta${fixasPendentes.length!==1?'s':''} obrigatória${fixasPendentes.length!==1?'s':''} ainda pendente${fixasPendentes.length!==1?'s':''} este mês.</span></div>`;
+    mountIcons(alertEl);
+  } else {
+    alertEl.innerHTML = '';
+  }
+
+  // Split by who (Dudu vs Beli) — entradas
+  const byWho = { dudu: 0, beli: 0 };
+  allEntradas.forEach(e=>{ byWho[e.who==='beli'?'beli':'dudu'] += parseFloat(e.valor)||0; });
+  const splitEl = document.getElementById('split-summary');
+  const totalWho = byWho.dudu + byWho.beli || 1;
+  splitEl.innerHTML = `
+    <div class="split-row">
+      <span class="who">${iconHtml('circle','icon icon-sm')} Dudu</span>
+      <span class="amt">${brl(byWho.dudu)} <span style="color:var(--text-muted);font-weight:500;font-size:11px;">(${Math.round(byWho.dudu/totalWho*100)}%)</span></span>
+    </div>
+    <div class="split-row">
+      <span class="who">${iconHtml('circle','icon icon-sm')} Beli</span>
+      <span class="amt">${brl(byWho.beli)} <span style="color:var(--text-muted);font-weight:500;font-size:11px;">(${Math.round(byWho.beli/totalWho*100)}%)</span></span>
+    </div>
+    <div class="split-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;">
+      <span class="who" style="color:var(--text);font-weight:600;">Total</span>
+      <span class="amt" style="color:var(--acid);">${brl(totalWho===1&&byWho.dudu===0&&byWho.beli===0?0:byWho.dudu+byWho.beli)}</span>
+    </div>
+  `;
+
+  // Category bars
+  const catbarEl = document.getElementById('catbar-list');
+  const catTotals = {};
+  Object.keys(CAT_META).forEach(k=>{
+    const arr = k==='fixas' ? fixasPagas : (localData[k]||[]);
+    catTotals[k] = sum(arr);
+  });
+  const grandTotal = Object.values(catTotals).reduce((a,b)=>a+b,0) || 1;
+  if(grandTotal <= 1 && tGastos===0){
+    catbarEl.innerHTML = `<div class="empty-state">${iconHtml('inbox')}<strong>Nenhum gasto ainda</strong><p>Assim que você registrar gastos pagos, eles aparecem aqui por categoria.</p></div>`;
+  } else {
+    catbarEl.innerHTML = Object.entries(CAT_META).map(([key,meta])=>{
+      const val = catTotals[key];
+      const pct = (val/grandTotal*100);
+      return `
+        <div class="catbar-row">
+          <div class="catbar-top">
+            <div class="catbar-name">${iconHtml(meta.icon)}<span>${meta.label}</span></div>
+            <div class="catbar-right"><span class="catbar-pct">${pct.toFixed(0)}%</span><span class="catbar-val">${brl(val)}</span></div>
+          </div>
+          <div class="catbar-track"><div class="catbar-fill" style="width:${Math.min(pct,100)}%;background:${meta.color}"></div></div>
+        </div>`;
+    }).join('');
+  }
+  mountIcons(catbarEl);
+
+  // Recent launches (mix all, sorted by date desc-ish using our DD/MM sort then reverse)
+  const allItems = [
+    ...allEntradas.map(i=>({...i, _cat:'entrada', _sign:1})),
+    ...gastosArr.map(i=>({...i, _cat:'gasto', _sign:-1})),
+  ];
+  const recent = sortByDate(allItems).slice(-8).reverse();
+  const recentEl = document.getElementById('recent-list');
+  if(!recent.length){
+    recentEl.innerHTML = `<div class="empty-state">${iconHtml('layers')}<strong>Sem lançamentos</strong><p>Adicione entradas ou gastos para ver o histórico aqui.</p></div>`;
+  } else {
+    recentEl.innerHTML = recent.map(item=>{
+      const name = item.origem || item.desc || 'Lançamento';
+      const sub = item.servico || (item._cat==='entrada' ? 'Entrada' : 'Gasto');
+      const whoTag = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+      return `
+        <div class="list-row">
+          <div class="list-date">${item.data||'—'}</div>
+          <div class="list-main"><strong>${name}</strong><span>${sub}</span></div>
+          <div class="list-tags">${whoTag}</div>
+          <div class="list-value ${item._sign>0?'pos':'neg'}">${item._sign>0?'+':'-'}${brl(item.valor)}</div>
+        </div>`;
+    }).join('');
+  }
+  mountIcons(recentEl);
+
+  renderChart(allEntradas, gastosArr);
+}
+
+function renderChart(entradas, gastos){
+  const byDay = {};
+  const addTo = (arr, key) => arr.forEach(i=>{
+    const day = (i.data||'').split('/')[0];
+    if(!day) return;
+    byDay[day] = byDay[day] || {in:0,out:0};
+    byDay[day][key] += parseFloat(i.valor)||0;
+  });
+  addTo(entradas,'in');
+  addTo(gastos,'out');
+  const days = Object.keys(byDay).sort((a,b)=>parseInt(a)-parseInt(b));
+  const dataIn = days.map(d=>byDay[d].in);
+  const dataOut = days.map(d=>byDay[d].out);
+
+  const ctx = document.getElementById('chart-fluxo').getContext('2d');
+  if(chart) chart.destroy();
+  if(!days.length){
+    ctx.canvas.parentElement.innerHTML = `<div class="empty-state">${iconHtml('barChart')}<strong>Sem dados suficientes</strong><p>O gráfico aparece assim que houver lançamentos no mês.</p></div>`;
+    mountIcons(ctx.canvas.parentElement);
+    return;
+  }
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: days.map(d=>`Dia ${d}`),
+      datasets: [
+        { label:'Entradas', data: dataIn, borderColor:'#edf252', backgroundColor:'#edf25222', tension:.35, fill:true, pointRadius:3 },
+        { label:'Gastos',   data: dataOut, borderColor:'#e5484d', backgroundColor:'#e5484d1a', tension:.35, fill:true, pointRadius:3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'#f2f2f0', font:{family:'Inter',size:11} } } },
+      scales:{
+        x:{ ticks:{ color:'#737373', font:{size:10} }, grid:{ color:'#1c1c1c' } },
+        y:{ ticks:{ color:'#737373', font:{size:10} }, grid:{ color:'#1c1c1c' } }
+      }
+    }
+  });
+}
+
+window.addEventListener('online', ()=>{ setSyncStatus('syncing','Reconectando…'); boot(); });
+window.addEventListener('offline', ()=> setSyncStatus('offline','Sem conexão'));
+
+boot();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</body>
+</html>
