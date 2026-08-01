@@ -57,7 +57,7 @@
 
   <div class="grid-cats">
     <!-- CONTAS OBRIGATÓRIAS -->
-    <section class="panel">
+    <section class="panel" data-cat="fixas">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#4C8DFF22;"><span data-icon="shieldCheck" data-icon-class="icon" style="color:#4C8DFF"></span></div>Contas Obrigatórias</div>
       </div>
@@ -66,7 +66,7 @@
     </section>
 
     <!-- IMPREVISTOS -->
-    <section class="panel">
+    <section class="panel" data-cat="imprevistos">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#e5484d22;"><span data-icon="bolt" style="color:#e5484d"></span></div>Imprevistos</div>
       </div>
@@ -75,7 +75,7 @@
     </section>
 
     <!-- ALIMENTAÇÃO -->
-    <section class="panel">
+    <section class="panel" data-cat="alimentacao">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#f2994a22;"><span data-icon="utensils" style="color:#f2994a"></span></div>Alimentação</div>
       </div>
@@ -84,7 +84,7 @@
     </section>
 
     <!-- LAZER -->
-    <section class="panel">
+    <section class="panel" data-cat="lazer">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#a179f222;"><span data-icon="gamepad" style="color:#a179f2"></span></div>Lazer</div>
       </div>
@@ -93,7 +93,7 @@
     </section>
 
     <!-- TRANSPORTE -->
-    <section class="panel">
+    <section class="panel" data-cat="transporte">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#3fbf8822;"><span data-icon="car" style="color:#3fbf88"></span></div>Transporte</div>
       </div>
@@ -102,7 +102,7 @@
     </section>
 
     <!-- CASA -->
-    <section class="panel">
+    <section class="panel" data-cat="casa">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#bbbf4922;"><span data-icon="home" style="color:#bbbf49"></span></div>Casa</div>
       </div>
@@ -111,7 +111,7 @@
     </section>
 
     <!-- INVESTIMENTOS -->
-    <section class="panel">
+    <section class="panel" data-cat="investimentos">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#4ecbd922;"><span data-icon="trendUp" style="color:#4ecbd9"></span></div>Investimentos</div>
       </div>
@@ -120,7 +120,7 @@
     </section>
 
     <!-- INDEFINIDOS (só aparece quando houver) -->
-    <section class="panel" id="panel-indefinidos" style="display:none;">
+    <section class="panel" id="panel-indefinidos" style="display:none; order:99;">
       <div class="cat-panel-head">
         <div class="cat-panel-title"><div class="dot-ic" style="background:#73737322;"><span data-icon="inbox" style="color:#737373"></span></div>Indefinidos <span class="tag tag-pay" id="indef-count">0</span></div>
       </div>
@@ -179,11 +179,15 @@
   <div class="modal" style="width:460px;" role="dialog" aria-modal="true" aria-labelledby="modal-extrato-title">
     <div class="modal-head"><span data-icon="fileText"></span><h2 id="modal-extrato-title">Importar Extrato Bancário</h2></div>
     <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Envie um print ou PDF do extrato. A IA lê e lista os gastos automaticamente.</p>
+    <div class="field">
+      <label>Provedor de IA</label>
+      <div id="f-provider"></div>
+    </div>
     <div class="upload-zone" id="upload-zone">
       <input type="file" id="extrato-file" accept="image/*,.pdf">
       <div data-icon="upload" data-icon-class="icon icon-lg"></div>
       <p>Clique ou arraste seu extrato aqui</p>
-      <p style="font-size:11px;">JPG, PNG ou PDF</p>
+      <p style="font-size:11px;" id="upload-hint">JPG, PNG ou PDF</p>
       <div class="upload-name" id="upload-name"></div>
     </div>
     <div class="thinking" id="thinking">
@@ -191,8 +195,9 @@
       <p style="font-size:12px;color:var(--acid);font-weight:600;">Lendo o extrato…</p>
     </div>
     <div class="field" style="margin-top:14px;">
-      <label for="api-key">Chave API Anthropic</label>
+      <label for="api-key" id="api-key-label">Chave API Anthropic</label>
       <input type="password" id="api-key" placeholder="sk-ant-...">
+      <p id="provider-note" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modal-extrato-cancel">Cancelar</button>
@@ -323,6 +328,22 @@ function renderAll(){
     }
   });
   renderIndefinidos();
+  reorderCategoryPanels();
+}
+
+// Reordena os painéis de categoria por valor total gasto (maior primeiro).
+// Puramente visual via CSS `order` — não mexe no DOM, então nenhum
+// listener/estado se perde. Recalculado toda vez que os dados mudam.
+function reorderCategoryPanels(){
+  const totals = CAT_ORDER.map(cat=>({
+    cat,
+    total: cat==='fixas' ? sum((localData.fixas||[]).filter(f=>f.pago===true)) : sum(localData[cat]||[])
+  })).sort((a,b)=> b.total - a.total);
+
+  totals.forEach((entry, idx)=>{
+    const panel = document.querySelector(`.panel[data-cat="${entry.cat}"]`);
+    if(panel) panel.style.order = idx;
+  });
 }
 
 function renderIndefinidos(){
@@ -562,6 +583,44 @@ document.getElementById('btn-extrato').addEventListener('click', ()=> openModal(
 document.getElementById('modal-extrato-cancel').addEventListener('click', ()=> closeModal(modalExtrato));
 modalExtrato.addEventListener('click', e=>{ if(e.target===modalExtrato) closeModal(modalExtrato); });
 
+// ── Provedores de IA suportados para leitura do extrato ──
+const AI_PROVIDERS = {
+  claude: {
+    label: 'Claude (Anthropic)',
+    keyLabel: 'Chave API Anthropic',
+    keyPlaceholder: 'sk-ant-...',
+    note: 'Aceita imagem e PDF.',
+    acceptsPdf: true,
+  },
+  chatgpt: {
+    label: 'ChatGPT (OpenAI)',
+    keyLabel: 'Chave API OpenAI',
+    keyPlaceholder: 'sk-...',
+    note: 'Aceita apenas imagem (JPG/PNG) — PDF não é suportado neste modo.',
+    acceptsPdf: false,
+  },
+  gemini: {
+    label: 'Gemini (Google)',
+    keyLabel: 'Chave API Google AI',
+    keyPlaceholder: 'AIza...',
+    note: 'Aceita imagem e PDF.',
+    acceptsPdf: true,
+  },
+};
+const providerSelect = createSelect(document.getElementById('f-provider'), {
+  options: Object.entries(AI_PROVIDERS).map(([value,p])=>({ value, label:p.label })),
+  value: 'claude',
+  onChange: updateProviderUI,
+});
+function updateProviderUI(){
+  const p = AI_PROVIDERS[providerSelect.value];
+  document.getElementById('api-key-label').textContent = p.keyLabel;
+  document.getElementById('api-key').placeholder = p.keyPlaceholder;
+  document.getElementById('provider-note').textContent = p.note;
+  document.getElementById('upload-hint').textContent = p.acceptsPdf ? 'JPG, PNG ou PDF' : 'Apenas JPG ou PNG';
+}
+updateProviderUI();
+
 document.getElementById('extrato-file').addEventListener('change', e=>{
   const file = e.target.files[0]; if(!file) return;
   document.getElementById('upload-name').textContent = file.name;
@@ -570,27 +629,78 @@ document.getElementById('extrato-file').addEventListener('change', e=>{
   reader.readAsDataURL(file);
 });
 
+const EXTRATO_PROMPT = 'Analise este extrato bancário. Liste APENAS os débitos/gastos/saídas (não incluir entradas/créditos). Para cada item retorne JSON array: [{data,desc,valor}] onde valor é número positivo. Retorne APENAS JSON puro sem markdown, sem texto antes ou depois.';
+
+function parseItemsFromText(text){
+  const clean = text.replace(/```json|```/g,'').trim();
+  const items = JSON.parse(clean);
+  if(!Array.isArray(items) || !items.length) throw new Error('Nenhum item encontrado');
+  return items;
+}
+
+async function callClaude(apiKey, mediaType, data){
+  const content = mediaType==='application/pdf'
+    ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data}},{type:'text',text:EXTRATO_PROMPT}]
+    : [{type:'image',source:{type:'base64',media_type:mediaType,data}},{type:'text',text:EXTRATO_PROMPT}];
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:2000, messages:[{role:'user',content}] })
+  });
+  const json = await res.json();
+  if(!res.ok) throw new Error(json.error?.message || 'Erro na API da Claude');
+  return parseItemsFromText(json.content?.[0]?.text || '[]');
+}
+
+async function callChatGPT(apiKey, mediaType, data){
+  if(mediaType==='application/pdf') throw new Error('ChatGPT não suporta PDF aqui — envie uma imagem (print) do extrato.');
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body: JSON.stringify({
+      model:'gpt-4o',
+      max_tokens:2000,
+      messages:[{ role:'user', content:[
+        { type:'text', text:EXTRATO_PROMPT },
+        { type:'image_url', image_url:{ url:`data:${mediaType};base64,${data}` } }
+      ]}]
+    })
+  });
+  const json = await res.json();
+  if(!res.ok) throw new Error(json.error?.message || 'Erro na API da OpenAI');
+  return parseItemsFromText(json.choices?.[0]?.message?.content || '[]');
+}
+
+async function callGemini(apiKey, mediaType, data){
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      contents:[{ parts:[
+        { text:EXTRATO_PROMPT },
+        { inline_data:{ mime_type:mediaType, data } }
+      ]}]
+    })
+  });
+  const json = await res.json();
+  if(!res.ok) throw new Error(json.error?.message || 'Erro na API do Gemini');
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  return parseItemsFromText(text);
+}
+
 document.getElementById('btn-process-extrato').addEventListener('click', async ()=>{
   if(!extratoData){ showToast('Selecione um arquivo','error'); return; }
   const apiKey = document.getElementById('api-key').value.trim();
   if(!apiKey){ showToast('Insira sua chave API','error'); return; }
+  const provider = providerSelect.value;
   document.getElementById('thinking').classList.add('show');
   const mediaType = extratoType==='application/pdf' ? 'application/pdf' : (extratoType||'image/jpeg');
-  const prompt_text = 'Analise este extrato bancário. Liste APENAS os débitos/gastos/saídas (não incluir entradas/créditos). Para cada item retorne JSON array: [{data,desc,valor}] onde valor é número positivo. Retorne APENAS JSON puro sem markdown.';
-  const content = mediaType==='application/pdf'
-    ? [{type:'document',source:{type:'base64',media_type:'application/pdf',data:extratoData}},{type:'text',text:prompt_text}]
-    : [{type:'image',source:{type:'base64',media_type:mediaType,data:extratoData}},{type:'text',text:prompt_text}];
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:2000, messages:[{role:'user',content}] })
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data.error?.message || 'Erro na API');
-    const text = data.content[0]?.text || '[]';
-    const items = JSON.parse(text.replace(/```json|```/g,'').trim());
-    if(!Array.isArray(items) || !items.length) throw new Error('Nenhum item encontrado');
+    let items;
+    if(provider==='claude') items = await callClaude(apiKey, mediaType, extratoData);
+    else if(provider==='chatgpt') items = await callChatGPT(apiKey, mediaType, extratoData);
+    else items = await callGemini(apiKey, mediaType, extratoData);
+
     items.forEach(item=>{
       push(ref(db, `meses/${currentMonth}/indefinidos`), { data:item.data||'', desc:item.desc||'Sem descrição', valor:parseFloat(item.valor)||0, who:'dudu' });
     });
