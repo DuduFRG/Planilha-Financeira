@@ -113,7 +113,7 @@
 import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
-import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, mountMonthYearPicker } from './shared/ui.js';
 import { stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, CATEGORIES, CAT_META, brl, sum, sortByDate,
@@ -126,9 +126,7 @@ mountSyncBadge();
 mountToast();
 
 let currentMonth = getSavedMonth();
-document.getElementById('month-picker-mount').innerHTML = monthPickerHtml(currentMonth);
-mountIcons();
-bindMonthPicker(m => { currentMonth = m; boot(); });
+mountMonthYearPicker(document.getElementById('month-picker-mount'), currentMonth, (m) => { currentMonth = m; boot(); });
 
 // Fix the placeholder panel title left from static markup
 document.querySelectorAll('[data-icon-wrap]').forEach(el=>{

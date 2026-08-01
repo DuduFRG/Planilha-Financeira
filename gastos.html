@@ -205,7 +205,7 @@
 import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
-import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, mountMonthYearPicker } from './shared/ui.js';
 import { createSelect, createDatePicker, stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update, get,
@@ -220,9 +220,7 @@ mountToast();
 mountIcons();
 
 let currentMonth = getSavedMonth();
-document.getElementById('month-picker-mount').innerHTML = monthPickerHtml(currentMonth);
-mountIcons();
-bindMonthPicker(m => { currentMonth = m; boot(); });
+mountMonthYearPicker(document.getElementById('month-picker-mount'), currentMonth, (m) => { currentMonth = m; boot(); });
 
 let localData = {};
 let fixasTemplate = [];
@@ -516,17 +514,10 @@ document.getElementById('btn-add-fixa-template').addEventListener('click', ()=>{
   if(!nome){ showToast('Informe o nome','error'); return; }
   if(!indef && val<=0){ showToast('Informe o valor ou marque Indefinido','error'); return; }
 
+  // Salva apenas no template — o listener subscribeFixasTemplate() já
+  // semeia automaticamente o mês atual (e futuros) via chave determinística,
+  // evitando duplicidade.
   push(ref(db,'fixasTemplate'), { nome, valor: indef?0:val, dia, valorIndefinido: indef });
-
-  const mesStr = currentMonth.split('-')[1];
-  push(ref(db, `meses/${currentMonth}/fixas`), {
-    data: String(dia).padStart(2,'0')+'/'+mesStr,
-    desc: nome + (indef ? ' (valor a definir)' : ''),
-    valor: indef?0:val,
-    pago: false,
-    who: 'dudu',
-    valorIndefinido: indef
-  });
 
   document.getElementById('nf-nome').value='';
   document.getElementById('nf-val').value='';

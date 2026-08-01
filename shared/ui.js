@@ -1,8 +1,9 @@
 // ============================================
 // Utilitários de interface compartilhados
 // ============================================
-import { iconHtml, mountIcons } from './icons.js';
-import { VALID_MONTHS, monthLabel, getSavedMonth, setSavedMonth } from './firebase.js';
+import { iconHtml } from './icons.js';
+import { setSavedMonth, MESES_PT, YEARS_AVAILABLE } from './firebase.js';
+import { createSelect } from './controls.js';
 
 export function mountLoadingScreen(){
   const el = document.createElement('div');
@@ -48,35 +49,46 @@ export function showToast(msg, type='success'){
   t._timer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-// ── Month picker (injetado no page-head) ──
-export function monthPickerHtml(current){
-  const opts = VALID_MONTHS.map(m=>`<option value="${m}" ${m===current?'selected':''}>${monthLabel(m)}</option>`).join('');
-  return `
-    <div class="month-picker">
-      ${iconHtml('calendar','icon icon-sm')}
-      <select id="month-select" aria-label="Selecionar mês">${opts}</select>
-      ${iconHtml('chevronDown','icon icon-sm')}
+// ── Month picker (injetado no page-head): dois dropdowns NOOMA — Mês e Ano ──
+
+/**
+ * Monta o seletor de período como dois dropdowns customizados separados
+ * (Mês / Ano), no padrão visual NOOMA — nada de <select> nativo.
+ * @param {HTMLElement} mountEl
+ * @param {string} current - 'YYYY-MM'
+ * @param {(value:string)=>void} onChange
+ */
+export function mountMonthYearPicker(mountEl, current, onChange){
+  const [initYear, initMonth] = current.split('-');
+  mountEl.innerHTML = `
+    <div class="monthyear-picker">
+      <div class="my-field"><div id="my-month"></div></div>
+      <div class="my-field my-field-year"><div id="my-year"></div></div>
     </div>
   `;
-}
+  let year = initYear, month = initMonth;
+  const monthOptions = MESES_PT.map((label,i)=>({ value:String(i+1).padStart(2,'0'), label }));
+  const yearOptions = YEARS_AVAILABLE.map(y=>({ value:String(y), label:String(y) }));
 
-export function bindMonthPicker(onChange){
-  const sel = document.getElementById('month-select');
-  sel?.addEventListener('change', ()=>{
-    setSavedMonth(sel.value);
-    onChange(sel.value);
+  function emit(){
+    const value = `${year}-${month}`;
+    setSavedMonth(value);
+    onChange(value);
+  }
+
+  const monthSelect = createSelect(mountEl.querySelector('#my-month'), {
+    options: monthOptions, value: month, onChange:(v)=>{ month=v; emit(); }
   });
-}
+  const yearSelect = createSelect(mountEl.querySelector('#my-year'), {
+    options: yearOptions, value: year, onChange:(v)=>{ year=v; emit(); }
+  });
 
-// ── Date input helpers (calendário nativo) ──
-export function dateInputHtml(id, ddmmValue, year){
-  const parts = (ddmmValue||'').split('/');
-  const iso = parts.length===2 ? `${year}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}` : '';
-  return `<input type="date" id="${id}" value="${iso}">`;
-}
-export function readDateInput(id){
-  const el = document.getElementById(id);
-  if(!el || !el.value) return '';
-  const [,mm,dd] = el.value.split('-');
-  return `${dd}/${mm}`;
+  return {
+    get value(){ return `${year}-${month}`; },
+    set value(v){
+      const [y,m] = v.split('-');
+      year=y; month=m;
+      monthSelect.value = m; yearSelect.value = y;
+    }
+  };
 }

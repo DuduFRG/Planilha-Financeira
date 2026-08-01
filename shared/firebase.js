@@ -3,7 +3,7 @@
 // Compartilhado entre Dashboard, Gastos e Entradas
 // ============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, push, remove, update, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue, push, remove, update, get, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD6A-XpYZLYZiE65eXwculdmIVey7R_zqM",
@@ -17,11 +17,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
-export { ref, onValue, push, remove, update, get };
+export { ref, onValue, push, remove, update, get, set };
 
 export const CATEGORIES = ['entradas','entradasFreela','fixas','imprevistos','alimentacao','lazer','transporte','casa','investimentos','indefinidos'];
 
-export const VALID_MONTHS = ['2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
+// Gera todos os meses de startYear até endYear (inclusive) — usado pelos
+// seletores de Mês e Ano separados na interface.
+function generateMonthsRange(startYear, endYear){
+  const months = [];
+  for(let y=startYear; y<=endYear; y++){
+    for(let m=1; m<=12; m++) months.push(`${y}-${String(m).padStart(2,'0')}`);
+  }
+  return months;
+}
+export const YEARS_AVAILABLE = [2026, 2027, 2028, 2029, 2030];
+export const VALID_MONTHS = generateMonthsRange(2026, 2030);
 
 export const CAT_META = {
   fixas:          { label:'Contas Obrigatórias', icon:'shieldCheck', color:'#4C8DFF' },
@@ -52,10 +62,11 @@ export function getSavedMonth(){
 }
 export function setSavedMonth(m){ localStorage.setItem('planilha_month', m); }
 
+export const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
 export function monthLabel(m){
-  const names = {'01':'Janeiro','02':'Fevereiro','03':'Março','04':'Abril','05':'Maio','06':'Junho','07':'Julho','08':'Agosto','09':'Setembro','10':'Outubro','11':'Novembro','12':'Dezembro'};
   const [y,mm] = m.split('-');
-  return `${names[mm]} ${y}`;
+  return `${MESES_PT[parseInt(mm)-1]} ${y}`;
 }
 
 export function ddmmToISO(ddmm, year){
@@ -111,48 +122,51 @@ export function subscribeEntradasTemplate(cb){
   });
 }
 
-// Preenche o mês com as contas fixas do template que ainda não existem nele
+// Preenche o mês com as contas fixas do template que ainda não existem nele.
+// Usa uma chave determinística (seed_<templateKey>) em vez de push() —
+// isso torna a operação idempotente: mesmo se chamada em paralelo (ex: ao
+// adicionar um novo template e o listener disparar ao mesmo tempo que o
+// boot da página), o resultado é sempre UM único registro, nunca duplicado.
 export function seedFixasFromTemplate(month, fixasTemplate){
   get(ref(db, `meses/${month}/fixas`)).then(snap=>{
-    const existing = snap.val() ? Object.values(snap.val()).map(v=>(v.desc||'').toLowerCase()) : [];
+    const existing = snap.val() || {};
     const mesStr = month.split('-')[1];
     fixasTemplate.forEach(t=>{
       if(t.isAutoDizimo) return;
-      const nomeLower = (t.nome||'').toLowerCase();
-      if(!existing.includes(nomeLower)){
-        push(ref(db, `meses/${month}/fixas`), {
-          data: t.dia ? String(t.dia).padStart(2,'0')+'/'+mesStr : '',
-          desc: t.nome || '',
-          valor: t.valorIndefinido ? 0 : (t.valor||0),
-          pago: false,
-          who: 'dudu',
-          valorIndefinido: t.valorIndefinido || false,
-          templateKey: t._key
-        });
-      }
+      const childKey = `seed_${t._key}`;
+      if(existing[childKey]) return; // já existe — preserva status "pago" e edições do usuário
+      set(ref(db, `meses/${month}/fixas/${childKey}`), {
+        data: t.dia ? String(t.dia).padStart(2,'0')+'/'+mesStr : '',
+        desc: t.nome || '',
+        valor: t.valorIndefinido ? 0 : (t.valor||0),
+        pago: false,
+        who: 'dudu',
+        valorIndefinido: t.valorIndefinido || false,
+        templateKey: t._key
+      });
     });
   });
 }
 
-// Preenche o mês com as entradas fixas (ex: salário CLT) do template
+// Preenche o mês com as entradas fixas (ex: salário CLT) do template.
+// Mesma estratégia de chave determinística — impossível duplicar.
 export function seedEntradasFromTemplate(month, entradasTemplate){
   get(ref(db, `meses/${month}/entradas`)).then(snap=>{
-    const existing = snap.val() ? Object.values(snap.val()).map(v=>(v.origem||'').toLowerCase()) : [];
+    const existing = snap.val() || {};
     const mesStr = month.split('-')[1];
     entradasTemplate.forEach(t=>{
-      const nomeLower = (t.origem||'').toLowerCase();
-      if(!existing.includes(nomeLower)){
-        push(ref(db, `meses/${month}/entradas`), {
-          data: t.dia ? String(t.dia).padStart(2,'0')+'/'+mesStr : '',
-          origem: t.origem || '',
-          servico: t.servico || 'Entrada fixa',
-          valor: t.valor || 0,
-          dizimo: t.dizimo===true,
-          who: t.who || 'dudu',
-          isFixa: true,
-          templateKey: t._key
-        });
-      }
+      const childKey = `seed_${t._key}`;
+      if(existing[childKey]) return; // já existe — preserva edições do usuário
+      set(ref(db, `meses/${month}/entradas/${childKey}`), {
+        data: t.dia ? String(t.dia).padStart(2,'0')+'/'+mesStr : '',
+        origem: t.origem || '',
+        servico: t.servico || 'Entrada fixa',
+        valor: t.valor || 0,
+        dizimo: t.dizimo===true,
+        who: t.who || 'dudu',
+        isFixa: true,
+        templateKey: t._key
+      });
     });
   });
 }

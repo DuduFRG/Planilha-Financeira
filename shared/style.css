@@ -62,8 +62,6 @@ body{
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
-  display: flex;
-  align-items: stretch;
 }
 
 ::selection{ background: var(--acid); color: var(--navy); }
@@ -103,19 +101,18 @@ svg.icon-lg{ width: 24px; height: 24px; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
   width: var(--nav-w);
-  flex: 0 0 var(--nav-w);
-  min-width: 0;
-  transition: width .2s ease, flex-basis .2s ease, padding .2s ease;
+  z-index: 100;
+  transition: width .2s ease, padding .2s ease;
 }
 body.nav-collapsed .sidebar{
   width: var(--nav-w-collapsed);
-  flex-basis: var(--nav-w-collapsed);
   padding: 20px 10px;
 }
 body.nav-collapsed .sidebar .brand-text,
@@ -212,12 +209,13 @@ body.nav-collapsed .nav-collapse-btn svg{ transform: rotate(180deg); }
 
 /* ============ MAIN CONTENT ============ */
 .main{
-  flex: 1 1 auto;
-  min-width: 0;
+  margin-left: var(--nav-w);
   padding: 28px 34px 60px;
   max-width: 100%;
   overflow-x: hidden;
+  transition: margin-left .2s ease;
 }
+body.nav-collapsed .main{ margin-left: var(--nav-w-collapsed); }
 
 .page-head{
   display: flex;
@@ -235,18 +233,15 @@ body.nav-collapsed .nav-collapse-btn svg{ transform: rotate(180deg); }
 }
 .page-head p{ color: var(--text-muted); font-size: 12.5px; margin-top: 4px; }
 
-.month-picker{
-  display: flex; align-items: center; gap: 10px;
-  background: var(--surface); border: 1px solid var(--border);
-  padding: 8px 14px; border-radius: var(--radius-sm);
+.monthyear-picker{ display: flex; align-items: center; gap: 8px; }
+.my-field{ min-width: 148px; }
+.my-field-year{ min-width: 96px; }
+.my-field .cselect-btn{ padding: 8px 12px; font-size: 13px; font-weight: 600; }
+
+@media (max-width: 430px){
+  .my-field{ min-width: 118px; }
+  .my-field-year{ min-width: 82px; }
 }
-.month-picker svg{ color: var(--text-muted); }
-.month-picker select{
-  background: none; border: none; color: var(--text);
-  font-family: var(--font-body); font-size: 13px; font-weight: 600;
-  cursor: pointer;
-}
-.month-picker select:focus-visible{ outline: none; }
 
 /* ============ CARDS / KPIs ============ */
 .kpi-grid{
@@ -582,10 +577,9 @@ body.nav-collapsed .nav-collapse-btn svg{ transform: rotate(180deg); }
 
 @media (max-width: 860px){
   html,body{ overflow-x: hidden; width: 100%; }
-  body{ display: block; }
   .nav-toggle{ display: flex; }
   .sidebar, body.nav-collapsed .sidebar{
-    position: fixed; left: 0; top: 0; height: 100vh; width: 260px; flex-basis: 260px;
+    width: 260px;
     z-index: 200; transform: translateX(-100%);
     transition: transform .25s ease;
     padding: 24px 16px;
@@ -597,7 +591,7 @@ body.nav-collapsed .nav-collapse-btn svg{ transform: rotate(180deg); }
   body.nav-collapsed .sidebar .nav-link span{ display: flex; }
   body.nav-collapsed .sidebar .nav-link{ justify-content: flex-start; padding: 10px 12px; }
   .nav-collapse-btn{ display: none; }
-  .main{ padding: 20px 16px 80px; padding-top: max(env(safe-area-inset-top), 70px); width: 100%; }
+  .main, body.nav-collapsed .main{ margin-left: 0; padding: 20px 16px 80px; padding-top: max(env(safe-area-inset-top), 70px); width: 100%; }
   .kpi-grid{ grid-template-columns: 1fr 1fr; gap: 10px; }
   .kpi-card{ padding: 14px 15px; }
   .kpi-value{ font-size: 19px; }

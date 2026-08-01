@@ -82,6 +82,10 @@
 <div class="modal-overlay" id="modal-freela">
   <div class="modal" style="width:480px;" role="dialog" aria-modal="true" aria-labelledby="modal-freela-title">
     <div class="modal-head"><span data-icon="bolt"></span><h2 id="modal-freela-title">Novo Freela</h2></div>
+    <div class="field">
+      <label>Tipo de Entrada</label>
+      <div id="f-tipo"></div>
+    </div>
     <div class="field-row">
       <div class="field"><label>Data</label><div id="f-data"></div></div>
       <div class="field"><label for="f-valor">Valor Total (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
@@ -130,7 +134,7 @@
 import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
-import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, monthPickerHtml, bindMonthPicker } from './shared/ui.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, mountMonthYearPicker } from './shared/ui.js';
 import { createSelect, createDatePicker, stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update,
@@ -145,15 +149,13 @@ mountToast();
 mountIcons();
 
 let currentMonth = getSavedMonth();
-document.getElementById('month-picker-mount').innerHTML = monthPickerHtml(currentMonth);
-mountIcons();
-bindMonthPicker(m => { currentMonth = m; boot(); });
+mountMonthYearPicker(document.getElementById('month-picker-mount'), currentMonth, (m) => { currentMonth = m; boot(); });
 
 let localData = {};
 let entradasTemplate = [];
 let unsubscribe = null;
 let editingKey = null;
-let editingIsFixa = false;
+let editingCat = null; // 'entradas' (Renda Fixa) ou 'entradasFreela' (Freela) — categoria ATUAL do item
 
 const FORMA_OPTIONS = [
   { value:'avista',        label:'À Vista (1x)' },
@@ -202,7 +204,7 @@ function dizimoRow(item){
       </div>
       <div class="list-value pos">+${brl(item.valor)}</div>
       <div class="list-actions">
-        <button class="icon-btn" data-edit="${item.isFixa?'fixaentrada':'freela'}:${item._key}">${iconHtml('edit')}</button>
+        <button class="icon-btn" data-edit="entradas:${item._key}">${iconHtml('edit')}</button>
         <button class="icon-btn del" data-del="entradas:${item._key}">${iconHtml('trash')}</button>
       </div>
     </div>`;
@@ -216,7 +218,7 @@ function freelaRow(item){
       <div class="list-tags">${formaLabel(item)}${who}</div>
       <div class="list-value pos">+${brl(item.valor)}</div>
       <div class="list-actions">
-        <button class="icon-btn" data-edit="freela:${item._key}">${iconHtml('edit')}</button>
+        <button class="icon-btn" data-edit="entradasFreela:${item._key}">${iconHtml('edit')}</button>
         <button class="icon-btn del" data-del="entradasFreela:${item._key}">${iconHtml('trash')}</button>
       </div>
     </div>`;
@@ -256,8 +258,8 @@ document.addEventListener('click', e=>{
   }
   const editBtn = e.target.closest('[data-edit]');
   if(editBtn){
-    const [type,key] = editBtn.dataset.edit.split(':');
-    openEditFreela(type, key);
+    const [cat,key] = editBtn.dataset.edit.split(':');
+    openEditFreela(cat, key);
     return;
   }
   const dizimoBtn = e.target.closest('[data-toggle-dizimo]');
@@ -290,6 +292,8 @@ document.addEventListener('click', e=>{
 const dataPicker = createDatePicker(document.getElementById('f-data'), {});
 const dizimoSelect = createSelect(document.getElementById('f-dizimo'), { options: dizimoOptions, value:'nao' });
 const whoSelect = createSelect(document.getElementById('f-who'), { options: whoOptions, value:'dudu' });
+const tipoOptions = [{ value:'entradas', label:'Renda Fixa', icon:'briefcase' }, { value:'entradasFreela', label:'Freela', icon:'bolt' }];
+const tipoSelect = createSelect(document.getElementById('f-tipo'), { options: tipoOptions, value:'entradasFreela' });
 const formaSelect = createSelect(document.getElementById('f-forma'), {
   options: FORMA_OPTIONS, value:'avista',
   onChange: (val)=> renderParcelas(val, currentParcelas())
@@ -401,8 +405,9 @@ document.getElementById('f-valor').addEventListener('input', ()=>{
 // ── MODAL: Freela add/edit ──
 const modalFreela = document.getElementById('modal-freela');
 document.getElementById('btn-add-freela').addEventListener('click', ()=>{
-  editingKey = null; editingIsFixa = false;
+  editingKey = null; editingCat = null;
   document.getElementById('modal-freela-title').textContent = 'Novo Freela';
+  tipoSelect.value = 'entradasFreela';
   dataPicker.value = new Date().toISOString().slice(0,10);
   document.getElementById('f-valor').value = '';
   document.getElementById('f-origem').value = '';
@@ -416,13 +421,14 @@ document.getElementById('btn-add-freela').addEventListener('click', ()=>{
 document.getElementById('modal-freela-cancel').addEventListener('click', ()=> closeModal(modalFreela));
 modalFreela.addEventListener('click', e=>{ if(e.target===modalFreela) closeModal(modalFreela); });
 
-function openEditFreela(type, key){
-  editingIsFixa = type === 'fixaentrada';
-  const arr = editingIsFixa ? (localData.entradas||[]) : (localData.entradasFreela||[]);
+function openEditFreela(cat, key){
+  const arr = localData[cat]||[];
   const item = arr.find(i=>i._key===key);
   if(!item) return;
   editingKey = key;
-  document.getElementById('modal-freela-title').textContent = editingIsFixa ? 'Editar Entrada Fixa' : 'Editar Freela';
+  editingCat = cat;
+  document.getElementById('modal-freela-title').textContent = 'Editar Entrada';
+  tipoSelect.value = cat;
   dataPicker.value = ddmmToISOLocal(item.data);
   document.getElementById('f-valor').value = item.valor;
   document.getElementById('f-origem').value = stripLeadingEmoji(item.origem)||'';
@@ -453,6 +459,7 @@ document.getElementById('modal-freela-save').addEventListener('click', ()=>{
   const parcelas = forma==='avista'
     ? [{ valor, data: isoToDDMMLocal(dataPicker.value), pago:true }]
     : readParcelasFromDOM().map(p=>({ ...p, data: isoToDDMMLocal(p.data) }));
+  const targetCat = tipoSelect.value; // 'entradas' (Renda Fixa) ou 'entradasFreela' (Freela)
 
   const payload = {
     data: isoToDDMMLocal(dataPicker.value),
@@ -464,13 +471,20 @@ document.getElementById('modal-freela-save').addEventListener('click', ()=>{
     formaRecebimento: forma,
     parcelas,
   };
+
   if(editingKey){
-    const targetCat = editingIsFixa ? 'entradas' : 'entradasFreela';
-    update(ref(db, `meses/${currentMonth}/${targetCat}/${editingKey}`), payload);
-    showToast('Alterações salvas');
+    if(targetCat !== editingCat){
+      // Usuário reclassificou o item (ex: estava em Renda Fixa e na verdade é Freela)
+      remove(ref(db, `meses/${currentMonth}/${editingCat}/${editingKey}`));
+      push(ref(db, `meses/${currentMonth}/${targetCat}`), payload);
+      showToast('Entrada movida e atualizada');
+    } else {
+      update(ref(db, `meses/${currentMonth}/${editingCat}/${editingKey}`), payload);
+      showToast('Alterações salvas');
+    }
   } else {
-    push(ref(db, `meses/${currentMonth}/entradasFreela`), payload);
-    showToast('Freela adicionado');
+    push(ref(db, `meses/${currentMonth}/${targetCat}`), payload);
+    showToast(targetCat==='entradas' ? 'Entrada fixa adicionada' : 'Freela adicionado');
   }
   closeModal(modalFreela);
 });
@@ -508,13 +522,10 @@ document.getElementById('btn-add-fixa-entrada').addEventListener('click', ()=>{
   const who = nfWhoSelect.value;
   if(!origem || val<=0){ showToast('Preencha origem e valor','error'); return; }
 
+  // Salva apenas no template — o listener subscribeEntradasTemplate() já
+  // semeia automaticamente o mês atual (e futuros) via chave determinística,
+  // evitando duplicidade.
   push(ref(db,'entradasTemplate'), { origem, valor:val, dia, who, servico:'Renda fixa' });
-
-  const mesStr = currentMonth.split('-')[1];
-  push(ref(db, `meses/${currentMonth}/entradas`), {
-    data: String(dia).padStart(2,'0')+'/'+mesStr,
-    origem, servico:'Renda fixa', valor:val, dizimo:false, who, isFixa:true
-  });
 
   document.getElementById('nf-origem').value='';
   document.getElementById('nf-val').value='';
