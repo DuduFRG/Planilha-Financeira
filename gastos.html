@@ -645,7 +645,7 @@ async function callClaude(apiKey, mediaType, data){
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:2000, messages:[{role:'user',content}] })
+    body: JSON.stringify({ model:'claude-sonnet-5', max_tokens:2000, messages:[{role:'user',content}] })
   });
   const json = await res.json();
   if(!res.ok) throw new Error(json.error?.message || 'Erro na API da Claude');
@@ -658,7 +658,7 @@ async function callChatGPT(apiKey, mediaType, data){
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
     body: JSON.stringify({
-      model:'gpt-4o',
+      model:'gpt-5',
       max_tokens:2000,
       messages:[{ role:'user', content:[
         { type:'text', text:EXTRATO_PROMPT },
@@ -672,7 +672,7 @@ async function callChatGPT(apiKey, mediaType, data){
 }
 
 async function callGemini(apiKey, mediaType, data){
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
