@@ -357,24 +357,48 @@ function renderIndefinidos(){
     <div class="indef-card">
       <div class="indef-top">
         <span class="indef-val">${brl(item.valor)}</span>
-        <span class="indef-date">${item.data||'—'}</span>
+        <span class="indef-date">${normalizeDateToDDMM(item.data)||'—'}</span>
         <button class="icon-btn del" data-del="indefinidos:${item._key}">${iconHtml('trash')}</button>
       </div>
       <input type="text" id="iname-${item._key}" value="${stripLeadingEmoji(item.desc)||''}" placeholder="Nome do gasto"
         style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;font-size:12.5px;">
+      <div class="field-row" style="margin:0;">
+        <div id="icat-${item._key}"></div>
+        <div id="ipag-${item._key}"></div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <div id="icat-${item._key}" style="flex:1;"></div>
+        <div id="iwho-${item._key}" style="flex:1;"></div>
         <button class="btn btn-primary btn-sm" data-confirm-indef="${item._key}">Mover</button>
       </div>
     </div>
   `).join('');
   mountIcons(list);
   arr.forEach(item=>{
-    const mount = document.getElementById(`icat-${item._key}`);
-    if(mount) indefCatSelects[item._key] = createSelect(mount, { options: catOptions, value:'', placeholder:'Selecionar categoria…' });
+    const catMount = document.getElementById(`icat-${item._key}`);
+    if(catMount) indefCatSelects[item._key] = createSelect(catMount, { options: catOptions, value:'', placeholder:'Categoria…' });
+    const pagMount = document.getElementById(`ipag-${item._key}`);
+    if(pagMount) indefPagSelects[item._key] = createSelect(pagMount, { options: pagamentoOptions, value:'', placeholder:'Pagamento…' });
+    const whoMount = document.getElementById(`iwho-${item._key}`);
+    if(whoMount) indefWhoSelects[item._key] = createSelect(whoMount, { options: whoOptions, value: item.who||'dudu' });
   });
 }
 const indefCatSelects = {};
+const indefPagSelects = {};
+const indefWhoSelects = {};
+
+// Normaliza qualquer formato de data vindo da IA (DD/MM/AAAA, AAAA-MM-DD, etc.)
+// para o padrão DD/MM usado no app — corrige o bug de data completa quebrando a exibição.
+function normalizeDateToDDMM(raw){
+  if(!raw) return '';
+  const s = String(raw).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); // AAAA-MM-DD
+  if(m) return `${m[3].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-]\d{2,4}$/); // DD/MM/AAAA
+  if(m) return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})$/); // já é DD/MM
+  if(m) return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}`;
+  return s;
+}
 
 // ── DELEGATED CLICK HANDLING ──
 document.addEventListener('click', (e)=>{
@@ -413,11 +437,21 @@ document.addEventListener('click', (e)=>{
     const item = (localData.indefinidos||[]).find(i=>i._key===key);
     if(!item) return;
     const nameEl = document.getElementById(`iname-${key}`);
-    const newItem = { data:item.data||'', desc: nameEl?.value || item.desc || '', valor:item.valor, who:item.who||'dudu' };
+    const pagVal = indefPagSelects[key]?.value || '';
+    const whoVal = indefWhoSelects[key]?.value || 'dudu';
+    const newItem = {
+      data: normalizeDateToDDMM(item.data),
+      desc: nameEl?.value || item.desc || '',
+      valor: item.valor,
+      who: whoVal
+    };
+    if(pagVal) newItem.pagamento = pagVal;
     if(catSel.value==='fixas') newItem.pago = false;
     remove(ref(db, `meses/${currentMonth}/indefinidos/${key}`));
     push(ref(db, `meses/${currentMonth}/${catSel.value}`), newItem);
     delete indefCatSelects[key];
+    delete indefPagSelects[key];
+    delete indefWhoSelects[key];
     showToast('Movido com sucesso');
     return;
   }
@@ -629,7 +663,7 @@ document.getElementById('extrato-file').addEventListener('change', e=>{
   reader.readAsDataURL(file);
 });
 
-const EXTRATO_PROMPT = 'Analise este extrato bancário. Liste APENAS os débitos/gastos/saídas (não incluir entradas/créditos). Para cada item retorne JSON array: [{data,desc,valor}] onde valor é número positivo. Retorne APENAS JSON puro sem markdown, sem texto antes ou depois.';
+const EXTRATO_PROMPT = 'Analise este extrato bancário. Liste APENAS os débitos/gastos/saídas (não incluir entradas/créditos). Para cada item retorne JSON array: [{data,desc,valor}] onde valor é número positivo e data está SEMPRE no formato "DD/MM" (dia e mês, dois dígitos, sem ano — ex: "05/07"). Retorne APENAS JSON puro sem markdown, sem texto antes ou depois.';
 
 function parseItemsFromText(text){
   const clean = text.replace(/```json|```/g,'').trim();
@@ -702,7 +736,7 @@ document.getElementById('btn-process-extrato').addEventListener('click', async (
     else items = await callGemini(apiKey, mediaType, extratoData);
 
     items.forEach(item=>{
-      push(ref(db, `meses/${currentMonth}/indefinidos`), { data:item.data||'', desc:item.desc||'Sem descrição', valor:parseFloat(item.valor)||0, who:'dudu' });
+      push(ref(db, `meses/${currentMonth}/indefinidos`), { data:normalizeDateToDDMM(item.data), desc:item.desc||'Sem descrição', valor:parseFloat(item.valor)||0, who:'dudu' });
     });
     showToast(`${items.length} gastos importados`);
     closeModal(modalExtrato);
