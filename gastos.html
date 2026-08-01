@@ -663,13 +663,19 @@ document.getElementById('extrato-file').addEventListener('change', e=>{
   reader.readAsDataURL(file);
 });
 
-const EXTRATO_PROMPT = 'Analise este extrato bancário. Liste APENAS os débitos/gastos/saídas (não incluir entradas/créditos). Para cada item retorne JSON array: [{data,desc,valor}] onde valor é número positivo e data está SEMPRE no formato "DD/MM" (dia e mês, dois dígitos, sem ano — ex: "05/07"). Retorne APENAS JSON puro sem markdown, sem texto antes ou depois.';
+const EXTRATO_PROMPT = 'Analise este extrato bancário e liste CADA transação de débito/gasto/saída (ignore entradas e créditos). Para cada transação, retorne um objeto com exatamente estes campos:\n' +
+  '"data": a data no formato "DD/MM" — dois dígitos, dia e mês apenas, NUNCA inclua o ano (ex: "29/07", nunca "29/07/2026").\n' +
+  '"desc": o nome COMPLETO do estabelecimento/comerciante exatamente como aparece no extrato, limpo e sem cortes. NÃO use rótulos genéricos como "Compra no débito" ou "Compra no crédito" sozinhos — a forma de pagamento já é registrada em outro campo do sistema, então aqui você deve trazer só o nome real do local. Exemplo: se o extrato mostra "Compra no débito: UBER *TRIP HELP.U", o campo desc deve ser apenas "Uber *Trip Help.U", nunca "Compra no débito".\n' +
+  '"valor": o valor da transação como número positivo, sem símbolo de moeda.\n' +
+  'Retorne APENAS um array JSON válido, sem markdown, sem texto antes ou depois, exatamente neste formato: [{"data":"29/07","desc":"Uber *Trip Help.U","valor":5.00}]';
 
 function parseItemsFromText(text){
   const clean = text.replace(/```json|```/g,'').trim();
   const items = JSON.parse(clean);
   if(!Array.isArray(items) || !items.length) throw new Error('Nenhum item encontrado');
-  return items;
+  // Limpeza defensiva: remove ":" ou espaços sobrando no fim da descrição,
+  // caso a IA ainda devolva um rótulo cortado.
+  return items.map(item => ({ ...item, desc: (item.desc||'').replace(/[:\s]+$/,'').trim() }));
 }
 
 async function callClaude(apiKey, mediaType, data){
