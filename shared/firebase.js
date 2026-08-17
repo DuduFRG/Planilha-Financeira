@@ -50,6 +50,16 @@ export const PAGAMENTO_OPTIONS = [
   { value:'dinheiro', label:'Dinheiro', icon:'cash',   color:'#EDF252' },
 ];
 
+// Quem gastou/registrou uma entrada — Dudu, Beli, ou a conta PJ da NOOMA
+// (usada quando a despesa/entrada passa pelo CNPJ da agência).
+export const WHO_META = {
+  dudu:  { label:'Dudu',  color:'#4C8DFF' },
+  beli:  { label:'Beli',  color:'#ff6ea1' },
+  nooma: { label:'NOOMA', color:'#edf252' },
+};
+export const WHO_OPTIONS = Object.entries(WHO_META).map(([value,meta])=>({ value, label:meta.label, color:meta.color }));
+export function whoLabel(who){ return WHO_META[who]?.label || who || ''; }
+
 // ── Helpers de formatação ──
 export function brl(v){
   return 'R$ ' + parseFloat(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');

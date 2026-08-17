@@ -372,6 +372,7 @@ body.nav-collapsed .main{ margin-left: var(--nav-w-collapsed); }
 .tag svg{ width: 11px; height: 11px; }
 .tag-who-dudu{ background: #4C8DFF1a; color: #6ea1ff; }
 .tag-who-beli{ background: #ff6ea11a; color: #ff8fbb; }
+.tag-who-nooma{ background: #edf2521f; color: #edf252; }
 .tag-pay{ background: var(--surface-3); color: var(--text-muted); }
 .tag-status-paid{ background: var(--success-dim); color: var(--success); }
 .tag-status-pending{ background: var(--olive-dim); color: var(--olive); }
