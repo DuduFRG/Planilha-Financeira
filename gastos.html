@@ -140,7 +140,7 @@
     </div>
     <div class="field-row">
       <div class="field"><label>Data</label><div id="f-data"></div></div>
-      <div class="field"><label for="f-valor">Valor (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
+      <div class="field"><label for="f-valor">Valor (R$)</label><input type="text" id="f-valor" placeholder="0,00"></div>
     </div>
     <div class="field"><label for="f-desc">Descrição</label><input type="text" id="f-desc" placeholder="Descreva o gasto"></div>
     <div class="field-row">
@@ -164,7 +164,7 @@
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px;">Adicionar nova conta fixa</p>
       <div class="field"><label for="nf-nome">Nome</label><input type="text" id="nf-nome" placeholder="Ex: Netflix"></div>
       <div class="field-row">
-        <div class="field"><label for="nf-val">Valor (R$)</label><input type="number" id="nf-val" step="0.01" placeholder="0,00"></div>
+        <div class="field"><label for="nf-val">Valor (R$)</label><input type="text" id="nf-val" placeholder="0,00"></div>
         <div class="field"><label for="nf-dia">Dia de vencimento</label><input type="number" id="nf-dia" min="1" max="31" placeholder="10"></div>
       </div>
       <div class="checkbox-field"><input type="checkbox" id="nf-indef"><label for="nf-indef">Valor indefinido (ex: fatura de cartão de crédito)</label></div>
@@ -211,7 +211,7 @@ import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, mountMonthYearPicker } from './shared/ui.js';
-import { createSelect, createDatePicker, stripLeadingEmoji } from './shared/controls.js';
+import { createSelect, createDatePicker, stripLeadingEmoji, parseBRLNumber, bindMoneyInput } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update, get,
   CAT_META, PAGAMENTO_OPTIONS, brl, sum, sortByDate,
@@ -251,6 +251,8 @@ const catSelect = createSelect(document.getElementById('f-cat'), { options: catO
 const dataPicker = createDatePicker(document.getElementById('f-data'), {});
 const pagamentoSelect = createSelect(document.getElementById('f-pagamento'), { options: pagamentoOptions, value:'', placeholder:'— Não informado —' });
 const whoSelect = createSelect(document.getElementById('f-who'), { options: whoOptions, value:'dudu' });
+bindMoneyInput(document.getElementById('f-valor'));
+bindMoneyInput(document.getElementById('nf-val'));
 
 function boot(){
   if(unsubscribe) unsubscribe();
@@ -419,8 +421,8 @@ document.addEventListener('click', (e)=>{
     const current = curr === 'true';
     const item = (localData.fixas||[]).find(f=>f._key===key);
     if(!current && item?.valorIndefinido){
-      const val = parseFloat(prompt('Qual o valor desta fatura?', ''));
-      if(isNaN(val) || val<=0){ showToast('Valor inválido','error'); return; }
+      const val = parseBRLNumber(prompt('Qual o valor desta fatura?', ''));
+      if(!val || val<=0){ showToast('Valor inválido','error'); return; }
       update(ref(db, `meses/${currentMonth}/fixas/${key}`), { pago:true, valor:val });
       showToast('Conta paga — '+brl(val));
     } else {
@@ -483,7 +485,7 @@ function openEditModal(key){
   document.getElementById('modal-gasto-title').textContent = 'Editar Gasto';
   catSelect.value = cat;
   dataPicker.value = ddmmToISOLocal(item.data);
-  document.getElementById('f-valor').value = item.valor;
+  document.getElementById('f-valor').value = String(item.valor).replace('.', ',');
   document.getElementById('f-desc').value = stripLeadingEmoji(item.desc)||'';
   pagamentoSelect.value = item.pagamento||'';
   whoSelect.value = item.who||'dudu';
@@ -503,7 +505,7 @@ function isoToDDMMLocal(iso){
 }
 
 document.getElementById('modal-gasto-save').addEventListener('click', ()=>{
-  const valor = parseFloat(document.getElementById('f-valor').value)||0;
+  const valor = parseBRLNumber(document.getElementById('f-valor').value);
   if(valor<=0){ showToast('Informe um valor válido','error'); return; }
   const cat = catSelect.value;
   const data = isoToDDMMLocal(dataPicker.value);
@@ -563,7 +565,7 @@ function renderFixasTemplateList(){
 
 document.getElementById('btn-add-fixa-template').addEventListener('click', ()=>{
   const nome = document.getElementById('nf-nome').value.trim();
-  const val = parseFloat(document.getElementById('nf-val').value)||0;
+  const val = parseBRLNumber(document.getElementById('nf-val').value);
   const dia = parseInt(document.getElementById('nf-dia').value)||1;
   const indef = document.getElementById('nf-indef').checked;
   if(!nome){ showToast('Informe o nome','error'); return; }
@@ -602,7 +604,7 @@ document.addEventListener('click', e=>{
     const t = fixasTemplate.find(i=>i._key===key);
     if(!t) return;
     const nome = prompt('Nome:', t.nome||''); if(nome===null) return;
-    const val = parseFloat(prompt('Valor:', t.valor||0)); if(isNaN(val)) return;
+    const val = parseBRLNumber(prompt('Valor:', String(t.valor||0).replace('.', ','))); if(!val){ return; }
     const dia = parseInt(prompt('Dia de vencimento:', t.dia||1)); if(isNaN(dia)) return;
     update(ref(db, `fixasTemplate/${key}`), { nome, valor:val, dia });
     showToast('Conta atualizada');

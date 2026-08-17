@@ -88,7 +88,7 @@
     </div>
     <div class="field-row">
       <div class="field"><label>Data</label><div id="f-data"></div></div>
-      <div class="field"><label for="f-valor">Valor Total (R$)</label><input type="number" id="f-valor" step="0.01" placeholder="0,00"></div>
+      <div class="field"><label for="f-valor">Valor Total (R$)</label><input type="text" id="f-valor" placeholder="0,00"></div>
     </div>
     <div class="field"><label for="f-origem">Origem / Cliente</label><input type="text" id="f-origem" placeholder="Ex: Anglo Marketing"></div>
     <div class="field"><label for="f-servico">Serviço prestado</label><input type="text" id="f-servico" placeholder="Ex: Edição de Vídeo"></div>
@@ -120,7 +120,7 @@
       <p style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px;">Adicionar nova entrada fixa</p>
       <div class="field"><label for="nf-origem">Origem</label><input type="text" id="nf-origem" placeholder="Ex: Empresa XPTO Ltda"></div>
       <div class="field-row">
-        <div class="field"><label for="nf-val">Valor (R$)</label><input type="number" id="nf-val" step="0.01" placeholder="0,00"></div>
+        <div class="field"><label for="nf-val">Valor (R$)</label><input type="text" id="nf-val" placeholder="0,00"></div>
         <div class="field"><label for="nf-dia">Dia de recebimento</label><input type="number" id="nf-dia" min="1" max="31" placeholder="5"></div>
       </div>
       <div class="field"><label>Quem recebe?</label><div id="nf-who"></div></div>
@@ -135,7 +135,7 @@ import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
 import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, mountMonthYearPicker } from './shared/ui.js';
-import { createSelect, createDatePicker, stripLeadingEmoji } from './shared/controls.js';
+import { createSelect, createDatePicker, stripLeadingEmoji, parseBRLNumber, bindMoneyInput } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update,
   brl, sum, sortByDate,
@@ -194,11 +194,13 @@ function formaLabel(item){
 function dizimoRow(item){
   const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
   const dv = item.dizimo === true;
+  const recebido = item.recebido !== false; // legado sem o campo conta como recebido
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
       <div class="list-main"><strong>${stripLeadingEmoji(item.origem)||'—'}</strong><span>${item.servico||''}</span></div>
       <div class="list-tags">
+        <button class="pill-btn ${recebido?'pill-paid':'pill-pending'}" data-toggle-recebido="${item._key}:${recebido}">${recebido?'Recebido':'Pendente'}</button>
         <button class="dizimo-pill ${dv?'dizimo-yes':'dizimo-no'}" data-toggle-dizimo="${item._key}:${dv}">Dízimo: ${dv?'Sim':'Não'}</button>
         ${who}
       </div>
@@ -227,6 +229,7 @@ function freelaRow(item){
 function renderAll(){
   const entradasFixas = (localData.entradas||[]);
   const freelas = (localData.entradasFreela||[]);
+  const entradasFixasRecebidas = entradasFixas.filter(e=>e.recebido !== false);
 
   const listFixasEl = document.getElementById('list-fixas');
   const sortedFixas = sortByDate(entradasFixas);
@@ -238,10 +241,11 @@ function renderAll(){
   listFreelaEl.innerHTML = sortedFreelas.length ? sortedFreelas.map(freelaRow).join('') : `<div class="list-empty">Nenhum freela registrado ainda.</div>`;
   mountIcons(listFreelaEl);
 
-  const tFixa = sum(entradasFixas);
+  const tFixa = sum(entradasFixasRecebidas);
   const tFreela = sum(freelas);
+  const pendentes = entradasFixas.length - entradasFixasRecebidas.length;
   document.getElementById('kpi-fixa').textContent = brl(tFixa);
-  document.getElementById('kpi-fixa-sub').textContent = `${entradasFixas.length} lançamento${entradasFixas.length!==1?'s':''}`;
+  document.getElementById('kpi-fixa-sub').textContent = `${entradasFixas.length} lançamento${entradasFixas.length!==1?'s':''}` + (pendentes>0 ? ` · ${pendentes} pendente${pendentes!==1?'s':''}` : '');
   document.getElementById('kpi-freela').textContent = brl(tFreela);
   document.getElementById('kpi-freela-sub').textContent = `${freelas.length} lançamento${freelas.length!==1?'s':''}`;
   document.getElementById('kpi-total').textContent = brl(tFixa+tFreela);
@@ -267,23 +271,18 @@ document.addEventListener('click', e=>{
     const [key, curr] = dizimoBtn.dataset.toggleDizimo.split(':');
     const current = curr === 'true';
     const newVal = !current;
+    const entry = (localData.entradas||[]).find(en=>en._key===key);
+    if(!entry) return;
     update(ref(db, `meses/${currentMonth}/entradas/${key}`), { dizimo:newVal });
-    const entry = (localData.entradas||[]).find(e=>e._key===key);
-    if(entry){
-      const dizimoVal = parseFloat(entry.valor||0) * 0.10;
-      const existingDizimo = (localData.fixas||[]).find(f=>f.dizimoEntradaKey===key);
-      if(existingDizimo) remove(ref(db, `meses/${currentMonth}/fixas/${existingDizimo._key}`));
-      if(newVal){
-        push(ref(db, `meses/${currentMonth}/fixas`), {
-          data:'', desc:'Dízimo — '+(entry.origem||entry.servico||'Entrada'),
-          valor:dizimoVal, pago:true, who:entry.who||'dudu',
-          dizimoEntradaKey:key, isAutoDizimo:true
-        });
-        showToast('Dízimo de '+brl(dizimoVal)+' registrado nas Contas Obrigatórias');
-      } else {
-        showToast('Dízimo removido das Contas Obrigatórias');
-      }
-    }
+    reconcileDizimoFixa(key, entry, newVal);
+    showToast(newVal ? 'Dízimo registrado nas Contas Obrigatórias' : 'Dízimo removido das Contas Obrigatórias');
+    return;
+  }
+  const recebidoBtn = e.target.closest('[data-toggle-recebido]');
+  if(recebidoBtn){
+    const [key, curr] = recebidoBtn.dataset.toggleRecebido.split(':');
+    const current = curr === 'true';
+    update(ref(db, `meses/${currentMonth}/entradas/${key}`), { recebido: !current });
     return;
   }
 });
@@ -294,6 +293,7 @@ const dizimoSelect = createSelect(document.getElementById('f-dizimo'), { options
 const whoSelect = createSelect(document.getElementById('f-who'), { options: whoOptions, value:'dudu' });
 const tipoOptions = [{ value:'entradas', label:'Renda Fixa', icon:'briefcase' }, { value:'entradasFreela', label:'Freela', icon:'bolt' }];
 const tipoSelect = createSelect(document.getElementById('f-tipo'), { options: tipoOptions, value:'entradasFreela' });
+bindMoneyInput(document.getElementById('f-valor'));
 const formaSelect = createSelect(document.getElementById('f-forma'), {
   options: FORMA_OPTIONS, value:'avista',
   onChange: (val)=> renderParcelas(val, currentParcelas())
@@ -303,7 +303,7 @@ const formaSelect = createSelect(document.getElementById('f-forma'), {
 let parcelaPickers = []; // referências dos date pickers de cada parcela
 
 function currentParcelas(){
-  const valorTotal = parseFloat(document.getElementById('f-valor').value)||0;
+  const valorTotal = parseBRLNumber(document.getElementById('f-valor').value);
   return buildDefaultParcelas(formaSelect.value, valorTotal);
 }
 
@@ -337,7 +337,7 @@ function renderParcelas(forma, parcelas){
   const rowsHtml = parcelas.map((p,i)=>`
     <div class="parcela-row" data-idx="${i}">
       <div class="pnum">Parcela ${i+1}</div>
-      <input type="number" step="0.01" class="parcela-valor" value="${p.valor}" placeholder="Valor">
+      <input type="text" inputmode="decimal" class="parcela-valor" value="${String(p.valor).replace('.',',')}" placeholder="Valor">
       <div class="parcela-date" data-idx="${i}"></div>
       ${forma==='personalizado' ? `<button type="button" class="parcela-remove" data-remove-parcela="${i}">${iconHtml('trash','icon icon-sm')}</button>` : '<span></span>'}
     </div>
@@ -356,6 +356,7 @@ function renderParcelas(forma, parcelas){
   });
 
   wrap.querySelectorAll('.parcela-valor').forEach(inp=>{
+    bindMoneyInput(inp);
     inp.addEventListener('input', updateSummary);
   });
 
@@ -381,7 +382,7 @@ function readParcelasFromDOM(){
   const wrap = document.getElementById('parcelas-wrap');
   const rows = [...wrap.querySelectorAll('.parcela-row')];
   return rows.map((row,i)=>({
-    valor: parseFloat(row.querySelector('.parcela-valor')?.value)||0,
+    valor: parseBRLNumber(row.querySelector('.parcela-valor')?.value),
     data: parcelaPickers[i]?.value || '',
     pago: false
   }));
@@ -392,7 +393,7 @@ function updateSummary(){
   if(!summaryEl) return;
   const parcelas = readParcelasFromDOM();
   const somaParcelas = parcelas.reduce((a,p)=>a+p.valor,0);
-  const valorTotal = parseFloat(document.getElementById('f-valor').value)||0;
+  const valorTotal = parseBRLNumber(document.getElementById('f-valor').value);
   const mismatch = Math.abs(somaParcelas - valorTotal) > 0.01;
   summaryEl.className = 'parcela-summary' + (mismatch ? ' mismatch' : '');
   summaryEl.innerHTML = `<span>Soma das parcelas: <strong>${brl(somaParcelas)}</strong></span><span>${mismatch ? 'Diferente do total (' + brl(valorTotal) + ')' : 'Confere com o total'}</span>`;
@@ -401,6 +402,27 @@ function updateSummary(){
 document.getElementById('f-valor').addEventListener('input', ()=>{
   renderParcelas(formaSelect.value, currentParcelas());
 });
+
+// ── Reconciliação do Dízimo (unificada para Renda Fixa e Freela) ──
+// Sempre que uma entrada (fixa ou freela) é salva com dízimo=sim, garante
+// que existe UMA conta obrigatória "Dízimo — ..." vinculada a ela; se
+// dízimo=não, remove essa conta. Idempotente: pode ser chamada várias
+// vezes seguidas sem duplicar ou exigir cliques repetidos.
+function reconcileDizimoFixa(entradaKey, entryData, dizimoAtivo){
+  const existing = (localData.fixas||[]).find(f=>f.dizimoEntradaKey===entradaKey);
+  if(dizimoAtivo){
+    const dizimoVal = Math.round(parseFloat(entryData.valor||0) * 0.10 * 100) / 100;
+    const payload = {
+      data:'', desc:'Dízimo — '+(entryData.origem||entryData.servico||'Entrada'),
+      valor:dizimoVal, pago:true, who:entryData.who||'dudu',
+      dizimoEntradaKey:entradaKey, isAutoDizimo:true
+    };
+    if(existing) update(ref(db, `meses/${currentMonth}/fixas/${existing._key}`), payload);
+    else push(ref(db, `meses/${currentMonth}/fixas`), payload);
+  } else if(existing){
+    remove(ref(db, `meses/${currentMonth}/fixas/${existing._key}`));
+  }
+}
 
 // ── MODAL: Freela add/edit ──
 const modalFreela = document.getElementById('modal-freela');
@@ -430,7 +452,7 @@ function openEditFreela(cat, key){
   document.getElementById('modal-freela-title').textContent = 'Editar Entrada';
   tipoSelect.value = cat;
   dataPicker.value = ddmmToISOLocal(item.data);
-  document.getElementById('f-valor').value = item.valor;
+  document.getElementById('f-valor').value = String(item.valor).replace('.', ',');
   document.getElementById('f-origem').value = stripLeadingEmoji(item.origem)||'';
   document.getElementById('f-servico').value = item.servico||'';
   dizimoSelect.value = item.dizimo ? 'sim':'nao';
@@ -453,37 +475,54 @@ function isoToDDMMLocal(iso){
 }
 
 document.getElementById('modal-freela-save').addEventListener('click', ()=>{
-  const valor = parseFloat(document.getElementById('f-valor').value)||0;
+  const valor = parseBRLNumber(document.getElementById('f-valor').value);
   if(valor<=0){ showToast('Informe um valor válido','error'); return; }
   const forma = formaSelect.value;
   const parcelas = forma==='avista'
     ? [{ valor, data: isoToDDMMLocal(dataPicker.value), pago:true }]
     : readParcelasFromDOM().map(p=>({ ...p, data: isoToDDMMLocal(p.data) }));
   const targetCat = tipoSelect.value; // 'entradas' (Renda Fixa) ou 'entradasFreela' (Freela)
+  const dizimoAtivo = dizimoSelect.value==='sim';
+  const who = whoSelect.value;
+  const origem = document.getElementById('f-origem').value||'';
+  const servico = document.getElementById('f-servico').value||'';
 
   const payload = {
     data: isoToDDMMLocal(dataPicker.value),
-    origem: document.getElementById('f-origem').value||'',
-    servico: document.getElementById('f-servico').value||'',
-    valor,
-    dizimo: dizimoSelect.value==='sim',
-    who: whoSelect.value,
+    origem, servico, valor,
+    dizimo: dizimoAtivo,
+    who,
     formaRecebimento: forma,
     parcelas,
   };
+  // Entrada fixa criada/editada manualmente pelo usuário já é considerada recebida
+  // (o status "pendente" é só para as que chegam automaticamente do template).
+  if(targetCat==='entradas'){
+    const existing = editingKey ? (localData[editingCat]||[]).find(i=>i._key===editingKey) : null;
+    payload.recebido = existing?.recebido ?? true;
+  }
+
+  function afterSave(finalKey){
+    reconcileDizimoFixa(finalKey, { valor, origem, servico, who }, dizimoAtivo);
+  }
 
   if(editingKey){
     if(targetCat !== editingCat){
       // Usuário reclassificou o item (ex: estava em Renda Fixa e na verdade é Freela)
+      const oldExistingDizimo = (localData.fixas||[]).find(f=>f.dizimoEntradaKey===editingKey);
+      if(oldExistingDizimo) remove(ref(db, `meses/${currentMonth}/fixas/${oldExistingDizimo._key}`));
       remove(ref(db, `meses/${currentMonth}/${editingCat}/${editingKey}`));
-      push(ref(db, `meses/${currentMonth}/${targetCat}`), payload);
+      const newRef = push(ref(db, `meses/${currentMonth}/${targetCat}`), payload);
+      afterSave(newRef.key);
       showToast('Entrada movida e atualizada');
     } else {
       update(ref(db, `meses/${currentMonth}/${editingCat}/${editingKey}`), payload);
+      afterSave(editingKey);
       showToast('Alterações salvas');
     }
   } else {
-    push(ref(db, `meses/${currentMonth}/${targetCat}`), payload);
+    const newRef = push(ref(db, `meses/${currentMonth}/${targetCat}`), payload);
+    afterSave(newRef.key);
     showToast(targetCat==='entradas' ? 'Entrada fixa adicionada' : 'Freela adicionado');
   }
   closeModal(modalFreela);
@@ -492,6 +531,7 @@ document.getElementById('modal-freela-save').addEventListener('click', ()=>{
 // ── MODAL: Gerenciar Entradas Fixas ──
 const modalFixasEntrada = document.getElementById('modal-fixas-entrada');
 const nfWhoSelect = createSelect(document.getElementById('nf-who'), { options: whoOptions, value:'dudu' });
+bindMoneyInput(document.getElementById('nf-val'));
 document.getElementById('btn-manage-fixas').addEventListener('click', ()=>{
   renderFixasEntradaList();
   openModal(modalFixasEntrada);
@@ -517,7 +557,7 @@ function renderFixasEntradaList(){
 
 document.getElementById('btn-add-fixa-entrada').addEventListener('click', ()=>{
   const origem = document.getElementById('nf-origem').value.trim();
-  const val = parseFloat(document.getElementById('nf-val').value)||0;
+  const val = parseBRLNumber(document.getElementById('nf-val').value);
   const dia = parseInt(document.getElementById('nf-dia').value)||1;
   const who = nfWhoSelect.value;
   if(!origem || val<=0){ showToast('Preencha origem e valor','error'); return; }

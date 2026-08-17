@@ -150,7 +150,7 @@ function boot(){
 }
 
 function renderAll(){
-  const entradas = localData.entradas||[];
+  const entradas = (localData.entradas||[]).filter(e=>e.recebido !== false);
   const entradasFreela = localData.entradasFreela||[];
   const allEntradas = [...entradas, ...entradasFreela];
   const fixas = localData.fixas||[];
