@@ -138,7 +138,7 @@ import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, m
 import { createSelect, createDatePicker, stripLeadingEmoji, parseBRLNumber, bindMoneyInput } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update,
-  brl, sum, sortByDate,
+  WHO_OPTIONS, whoLabel, brl, sum, sortByDate,
   getSavedMonth, subscribeMonth, subscribeEntradasTemplate, seedEntradasFromTemplate
 } from './shared/firebase.js';
 
@@ -163,7 +163,7 @@ const FORMA_OPTIONS = [
   { value:'2x',            label:'2x (valores livres)' },
   { value:'personalizado', label:'Personalizado (N parcelas)' },
 ];
-const whoOptions = [{ value:'dudu', label:'Dudu', color:'#4C8DFF' }, { value:'beli', label:'Beli', color:'#ff6ea1' }];
+const whoOptions = WHO_OPTIONS;
 const dizimoOptions = [{ value:'nao', label:'Não' }, { value:'sim', label:'Sim' }];
 
 function boot(){
@@ -192,7 +192,7 @@ function formaLabel(item){
 }
 
 function dizimoRow(item){
-  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${whoLabel(item.who)}</span>` : '';
   const dv = item.dizimo === true;
   const recebido = item.recebido !== false; // legado sem o campo conta como recebido
   return `
@@ -212,7 +212,7 @@ function dizimoRow(item){
     </div>`;
 }
 function freelaRow(item){
-  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${whoLabel(item.who)}</span>` : '';
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>

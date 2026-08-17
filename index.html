@@ -19,6 +19,7 @@
   .split-row{ display:flex; justify-content:space-between; align-items:center; padding:9px 2px; border-bottom:1px solid var(--border-soft); font-size:12.5px; }
   .split-row:last-child{ border-bottom:none; }
   .split-row .who{ display:flex; align-items:center; gap:9px; color: var(--text-muted); }
+  .split-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; display:inline-block; }
   .split-row .amt{ font-family: var(--font-display); font-weight:700; }
   .pending-strip{ display:flex; align-items:center; gap:10px; padding:11px 14px; background: var(--olive-dim); border: 1px solid var(--olive-dim); border-radius: var(--radius-sm); margin-bottom: 16px; font-size:12.5px; color: var(--olive); }
   .pending-strip svg{ stroke: var(--olive); flex-shrink:0; }
@@ -117,7 +118,7 @@ import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, m
 import { stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, CATEGORIES, CAT_META, brl, sum, sortByDate,
-  getSavedMonth, monthLabel, subscribeMonth
+  getSavedMonth, monthLabel, subscribeMonth, whoLabel, WHO_META
 } from './shared/firebase.js';
 
 renderNav('index.html');
@@ -189,23 +190,24 @@ function renderAll(){
     alertEl.innerHTML = '';
   }
 
-  // Split by who (Dudu vs Beli) — entradas
-  const byWho = { dudu: 0, beli: 0 };
-  allEntradas.forEach(e=>{ byWho[e.who==='beli'?'beli':'dudu'] += parseFloat(e.valor)||0; });
+  // Split by who (Dudu / Beli / NOOMA) — entradas
+  const byWho = {};
+  Object.keys(WHO_META).forEach(k=> byWho[k]=0);
+  allEntradas.forEach(e=>{ const k = WHO_META[e.who] ? e.who : 'dudu'; byWho[k] += parseFloat(e.valor)||0; });
   const splitEl = document.getElementById('split-summary');
-  const totalWho = byWho.dudu + byWho.beli || 1;
-  splitEl.innerHTML = `
+  const totalWho = Object.values(byWho).reduce((a,b)=>a+b,0) || 1;
+  const rows = Object.entries(WHO_META).map(([key,meta])=>{
+    const val = byWho[key];
+    return `
     <div class="split-row">
-      <span class="who">${iconHtml('circle','icon icon-sm')} Dudu</span>
-      <span class="amt">${brl(byWho.dudu)} <span style="color:var(--text-muted);font-weight:500;font-size:11px;">(${Math.round(byWho.dudu/totalWho*100)}%)</span></span>
-    </div>
-    <div class="split-row">
-      <span class="who">${iconHtml('circle','icon icon-sm')} Beli</span>
-      <span class="amt">${brl(byWho.beli)} <span style="color:var(--text-muted);font-weight:500;font-size:11px;">(${Math.round(byWho.beli/totalWho*100)}%)</span></span>
-    </div>
+      <span class="who"><span class="split-dot" style="background:${meta.color}"></span>${meta.label}</span>
+      <span class="amt">${brl(val)} <span style="color:var(--text-muted);font-weight:500;font-size:11px;">(${Math.round(val/totalWho*100)}%)</span></span>
+    </div>`;
+  }).join('');
+  splitEl.innerHTML = rows + `
     <div class="split-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:12px;">
       <span class="who" style="color:var(--text);font-weight:600;">Total</span>
-      <span class="amt" style="color:var(--acid);">${brl(totalWho===1&&byWho.dudu===0&&byWho.beli===0?0:byWho.dudu+byWho.beli)}</span>
+      <span class="amt" style="color:var(--acid);">${brl(totalWho===1&&Object.values(byWho).every(v=>v===0)?0:Object.values(byWho).reduce((a,b)=>a+b,0))}</span>
     </div>
   `;
 
@@ -248,7 +250,7 @@ function renderAll(){
     recentEl.innerHTML = recent.map(item=>{
       const name = stripLeadingEmoji(item.origem || item.desc) || 'Lançamento';
       const sub = item.servico || (item._cat==='entrada' ? 'Entrada' : 'Gasto');
-      const whoTag = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+      const whoTag = item.who ? `<span class="tag tag-who-${item.who}">${whoLabel(item.who)}</span>` : '';
       return `
         <div class="list-row">
           <div class="list-date">${item.data||'—'}</div>

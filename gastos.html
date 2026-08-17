@@ -214,7 +214,7 @@ import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, m
 import { createSelect, createDatePicker, stripLeadingEmoji, parseBRLNumber, bindMoneyInput } from './shared/controls.js';
 import {
   db, ref, onValue, push, remove, update, get,
-  CAT_META, PAGAMENTO_OPTIONS, brl, sum, sortByDate,
+  CAT_META, PAGAMENTO_OPTIONS, WHO_OPTIONS, whoLabel, brl, sum, sortByDate,
   getSavedMonth, subscribeMonth, subscribeFixasTemplate, seedFixasFromTemplate
 } from './shared/firebase.js';
 
@@ -245,7 +245,7 @@ function pagamentoTag(item){
 // ── Controles customizados do modal de gasto ──
 const catOptions = CAT_ORDER.map(k=>({ value:k, label:CAT_META[k].label, icon:CAT_META[k].icon, color:CAT_META[k].color }));
 const pagamentoOptions = [{ value:'', label:'— Não informado —' }, ...PAGAMENTO_OPTIONS];
-const whoOptions = [{ value:'dudu', label:'Dudu', color:'#4C8DFF' }, { value:'beli', label:'Beli', color:'#ff6ea1' }];
+const whoOptions = WHO_OPTIONS;
 
 const catSelect = createSelect(document.getElementById('f-cat'), { options: catOptions, value:'fixas' });
 const dataPicker = createDatePicker(document.getElementById('f-data'), {});
@@ -283,7 +283,7 @@ function renderList(containerId, arr, cat, extraRender){
 }
 
 function defaultRow(item, cat){
-  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${whoLabel(item.who)}</span>` : '';
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
@@ -298,7 +298,7 @@ function defaultRow(item, cat){
 }
 
 function fixaRow(item){
-  const who = item.who ? `<span class="tag tag-who-${item.who}">${item.who==='dudu'?'Dudu':'Beli'}</span>` : '';
+  const who = item.who ? `<span class="tag tag-who-${item.who}">${whoLabel(item.who)}</span>` : '';
   const pago = item.pago === true;
   const valDisplay = (item.valorIndefinido && !pago) ? `<span style="color:var(--text-muted);font-size:12px;">A definir</span>` : brl(item.valor);
   return `
