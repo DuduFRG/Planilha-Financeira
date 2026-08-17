@@ -193,3 +193,43 @@ export function stripLeadingEmoji(str){
   if(!str) return str;
   return str.replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]\s*/u, '').trim();
 }
+
+/**
+ * Converte um texto de valor no padrão brasileiro (vírgula decimal,
+ * ponto como separador de milhar opcional) em número — ex: "98,50" → 98.5,
+ * "1.234,56" → 1234.56. Também aceita ponto decimal puro como fallback.
+ */
+export function parseBRLNumber(str){
+  if(str == null) return 0;
+  let s = String(str).trim();
+  if(!s) return 0;
+  if(s.includes(',')){
+    s = s.replace(/\./g, '').replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/**
+ * Transforma um <input> em campo de valor monetário: teclado numérico no
+ * celular, aceita apenas dígitos e uma vírgula decimal — nunca deixa o
+ * usuário digitar letras/símbolos, e nunca troca a vírgula por ponto na tela.
+ */
+export function bindMoneyInput(el){
+  if(!el || el.dataset.moneyBound) return;
+  el.dataset.moneyBound = '1';
+  el.type = 'text';
+  el.setAttribute('inputmode', 'decimal');
+  el.setAttribute('autocomplete', 'off');
+  el.addEventListener('input', ()=>{
+    let v = el.value.replace(/[^0-9,]/g, '');
+    const firstComma = v.indexOf(',');
+    if(firstComma !== -1){
+      v = v.slice(0, firstComma+1) + v.slice(firstComma+1).replace(/,/g, '');
+      // limita a 2 casas decimais
+      const [intPart, decPart] = v.split(',');
+      v = decPart !== undefined ? `${intPart},${decPart.slice(0,2)}` : v;
+    }
+    el.value = v;
+  });
+}

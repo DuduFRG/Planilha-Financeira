@@ -165,6 +165,7 @@ export function seedEntradasFromTemplate(month, entradasTemplate){
         dizimo: t.dizimo===true,
         who: t.who || 'dudu',
         isFixa: true,
+        recebido: false,
         templateKey: t._key
       });
     });
