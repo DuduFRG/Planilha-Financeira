@@ -66,11 +66,58 @@ export function brl(v){
 }
 export function sum(arr){ return (arr||[]).reduce((a,i)=>a+(parseFloat(i.valor)||0),0); }
 
-export function getSavedMonth(){
-  const saved = localStorage.getItem('planilha_month');
-  return (saved && VALID_MONTHS.includes(saved)) ? saved : '2026-06';
+// ── Relógio de Brasília ──
+// Sempre usa o fuso America/Sao_Paulo, independente do dispositivo/navegador
+// do usuário — é a fonte única de verdade para "hoje" no app inteiro.
+export function getBrasiliaTodayISO(){
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit'
+  }).format(new Date()); // 'YYYY-MM-DD'
 }
-export function setSavedMonth(m){ localStorage.setItem('planilha_month', m); }
+export function getBrasiliaTodayParts(){
+  const [y,m,d] = getBrasiliaTodayISO().split('-').map(Number);
+  return { year:y, month:m, day:d };
+}
+function clampToValidMonths(monthStr){
+  return VALID_MONTHS.includes(monthStr) ? monthStr : VALID_MONTHS[0];
+}
+export function getCurrentRealMonth(){
+  const { year, month } = getBrasiliaTodayParts();
+  return clampToValidMonths(`${year}-${String(month).padStart(2,'0')}`);
+}
+
+// O app sempre abre no mês real de hoje (horário de Brasília) — não fica
+// "preso" no último mês visitado. setSavedMonth é mantido só para não
+// quebrar chamadas existentes, mas não influencia mais o mês de abertura.
+export function getSavedMonth(){ return getCurrentRealMonth(); }
+export function setSavedMonth(){ /* intencionalmente vazio — ver getSavedMonth() */ }
+
+/**
+ * Compara a data "DD/MM" de um lançamento com o dia de hoje em Brasília.
+ * Retorna true se a data já chegou ou já passou (ex: hoje é dia 10 e a
+ * entrada é dia 08 ou dia 10 → true; entrada é dia 15 → false).
+ */
+export function dataJaChegou(ddmm, monthStr){
+  if(!ddmm) return true; // sem data definida, não bloqueia
+  const [dd, mm] = ddmm.split('/').map(Number);
+  if(!dd || !mm) return true;
+  const [anoMes] = [monthStr.split('-')[0]];
+  const dataAlvo = `${anoMes}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+  return dataAlvo <= getBrasiliaTodayISO();
+}
+
+/**
+ * Status "recebido" de uma entrada fixa: respeita uma decisão manual do
+ * usuário (recebidoManual true/false) se existir; senão, decide sozinho
+ * comparando a data do lançamento com o calendário de Brasília — assim
+ * que o dia chega, passa a contar como recebido automaticamente.
+ */
+export function isEntradaRecebida(item, monthStr){
+  if(item.recebidoManual === true) return true;
+  if(item.recebidoManual === false) return false;
+  if(item.recebido === true) return true; // confirmação manual de versões antigas
+  return dataJaChegou(item.data, monthStr);
+}
 
 export const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -175,7 +222,6 @@ export function seedEntradasFromTemplate(month, entradasTemplate){
         dizimo: t.dizimo===true,
         who: t.who || 'dudu',
         isFixa: true,
-        recebido: false,
         templateKey: t._key
       });
     });
