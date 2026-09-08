@@ -3,7 +3,10 @@
    Design tokens & base styles
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+/* Fontes carregadas via <link> no <head> de cada página (preconnect +
+   stylesheet) em vez de @import — evita o efeito cascata em que o
+   navegador só descobre a fonte depois de baixar e ler este arquivo
+   inteiro, o que atrasa a primeira renderização. */
 
 :root{
   /* Paleta oficial NOOMA */
