@@ -12,6 +12,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Finanças">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="shared/style.css">
 <style>
   .chart-wrap{ position: relative; height: 240px; }
@@ -24,6 +27,25 @@
   .pending-strip{ display:flex; align-items:center; gap:10px; padding:11px 14px; background: var(--olive-dim); border: 1px solid var(--olive-dim); border-radius: var(--radius-sm); margin-bottom: 16px; font-size:12.5px; color: var(--olive); }
   .pending-strip svg{ stroke: var(--olive); flex-shrink:0; }
   .pending-strip strong{ color: var(--text); }
+
+  .advisor-panel{ background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%); border: 1px solid var(--acid-dim); }
+  .advisor-lead{ display:flex; align-items:flex-start; gap:14px; }
+  .advisor-icon{ width:40px; height:40px; border-radius:11px; background:var(--acid-dim); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .advisor-icon svg{ color: var(--acid); width:20px; height:20px; }
+  .advisor-lead p{ font-size:12.5px; color: var(--text-muted); margin-top:4px; max-width:52ch; }
+  .advisor-thinking{ display:none; text-align:center; padding:26px 10px; }
+  .advisor-thinking.show{ display:block; }
+  .advisor-thinking p{ font-size:12.5px; color: var(--acid); font-weight:600; margin-top:10px; }
+  .advisor-response{ display:none; font-size:13px; line-height:1.65; color: var(--text); }
+  .advisor-response.show{ display:block; }
+  .advisor-response p{ margin-bottom:12px; }
+  .advisor-response ul{ margin: 0 0 14px 18px; display:flex; flex-direction:column; gap:6px; }
+  .advisor-response li{ font-size:13px; }
+  .advisor-response strong{ color: var(--acid); }
+  @media (max-width: 640px){
+    .advisor-lead{ flex-direction: column; align-items: stretch; }
+    .advisor-lead .btn{ width: 100%; justify-content: center; }
+  }
 </style>
 </head>
 <body>
@@ -108,17 +130,55 @@
       <div class="list" id="recent-list"></div>
     </section>
   </div>
+  <section class="panel advisor-panel">
+    <div class="advisor-lead">
+      <div class="advisor-icon" data-icon="sparkle"></div>
+      <div style="flex:1;">
+        <div class="panel-title" style="margin-bottom:2px;">Conselheiro IA</div>
+        <p>Analisa os dados deste mês (entradas, gastos, categorias, dízimo, pendências) e te dá sugestões práticas para melhorar. Usa sua própria chave do Gemini — nada fica salvo.</p>
+      </div>
+      <button class="btn btn-primary" id="btn-open-advisor"><span data-icon="bolt"></span>Consultar</button>
+    </div>
+  </section>
 </main>
 
+<!-- MODAL: Conselheiro IA -->
+<div class="modal-overlay" id="modal-advisor">
+  <div class="modal" style="width:520px;" role="dialog" aria-modal="true" aria-labelledby="modal-advisor-title">
+    <div class="modal-head"><span data-icon="sparkle"></span><h2 id="modal-advisor-title">Conselheiro IA</h2></div>
+    <div id="advisor-form-section">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">A IA vai olhar o resumo do mês atual (sem dados sensíveis como nomes de contas ou senhas) e sugerir melhorias práticas.</p>
+      <div class="field">
+        <label for="advisor-api-key">Chave API Google Gemini</label>
+        <input type="password" id="advisor-api-key" placeholder="AIza...">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modal-advisor-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-run-advisor"><span data-icon="bolt"></span>Analisar</button>
+      </div>
+    </div>
+    <div class="advisor-thinking" id="advisor-thinking">
+      <div class="spinner" style="margin:0 auto;"></div>
+      <p>Analisando suas finanças…</p>
+    </div>
+    <div class="advisor-response" id="advisor-response"></div>
+    <div class="modal-actions" id="advisor-response-actions" style="display:none;">
+      <button class="btn btn-ghost" id="modal-advisor-close">Fechar</button>
+      <button class="btn btn-outline" id="btn-advisor-again"><span data-icon="refresh"></span>Analisar de novo</button>
+    </div>
+  </div>
+</div>
+
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script type="module">
 import { mountIcons, iconHtml } from './shared/icons.js';
 import { renderNav } from './shared/nav.js';
 import { requireAuth, logout } from './shared/auth.js';
-import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, mountMonthYearPicker } from './shared/ui.js';
+import { mountLoadingScreen, hideLoadingScreen, mountSyncBadge, setSyncStatus, mountToast, showToast, mountMonthYearPicker } from './shared/ui.js';
 import { stripLeadingEmoji } from './shared/controls.js';
 import {
   db, ref, onValue, CATEGORIES, CAT_META, brl, sum, sortByDate,
-  getSavedMonth, monthLabel, subscribeMonth, whoLabel, WHO_META
+  getSavedMonth, monthLabel, subscribeMonth, whoLabel, WHO_META, isEntradaRecebida
 } from './shared/firebase.js';
 
 renderNav('index.html');
@@ -151,7 +211,7 @@ function boot(){
 }
 
 function renderAll(){
-  const entradas = (localData.entradas||[]).filter(e=>e.recebido !== false);
+  const entradas = (localData.entradas||[]).filter(e=>isEntradaRecebida(e, currentMonth));
   const entradasFreela = localData.entradasFreela||[];
   const allEntradas = [...entradas, ...entradasFreela];
   const fixas = localData.fixas||[];
@@ -309,8 +369,110 @@ function renderChart(entradas, gastos){
 window.addEventListener('online', ()=>{ setSyncStatus('syncing','Reconectando…'); boot(); });
 window.addEventListener('offline', ()=> setSyncStatus('offline','Sem conexão'));
 
+// ── CONSELHEIRO IA ──
+const modalAdvisor = document.getElementById('modal-advisor');
+function openModal(el){ el.classList.add('open'); }
+function closeModal(el){ el.classList.remove('open'); }
+
+function resetAdvisorModal(){
+  document.getElementById('advisor-form-section').style.display = 'block';
+  document.getElementById('advisor-thinking').classList.remove('show');
+  document.getElementById('advisor-response').classList.remove('show');
+  document.getElementById('advisor-response-actions').style.display = 'none';
+}
+
+document.getElementById('btn-open-advisor').addEventListener('click', ()=>{
+  resetAdvisorModal();
+  openModal(modalAdvisor);
+});
+document.getElementById('modal-advisor-cancel').addEventListener('click', ()=> closeModal(modalAdvisor));
+document.getElementById('modal-advisor-close').addEventListener('click', ()=> closeModal(modalAdvisor));
+document.getElementById('btn-advisor-again').addEventListener('click', ()=>{ resetAdvisorModal(); });
+modalAdvisor.addEventListener('click', e=>{ if(e.target===modalAdvisor) closeModal(modalAdvisor); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(modalAdvisor); });
+
+// Monta um resumo compacto e sem dados sensíveis (sem nomes de origem de
+// entradas, sem chaves) para enviar à IA.
+function buildFinanceSummary(){
+  const entradasFixas = (localData.entradas||[]).filter(e=>isEntradaRecebida(e, currentMonth));
+  const freelas = localData.entradasFreela||[];
+  const allEntradas = [...entradasFixas, ...freelas];
+  const fixasPagas = (localData.fixas||[]).filter(f=>f.pago===true);
+  const fixasPendentes = (localData.fixas||[]).filter(f=>f.pago!==true);
+  const gastosPorCategoria = {};
+  Object.keys(CAT_META).forEach(k=>{
+    const arr = k==='fixas' ? fixasPagas : (localData[k]||[]);
+    gastosPorCategoria[CAT_META[k].label] = Math.round(sum(arr)*100)/100;
+  });
+  const tEntradas = Math.round(sum(allEntradas)*100)/100;
+  const tGastos = Math.round(Object.values(gastosPorCategoria).reduce((a,b)=>a+b,0)*100)/100;
+  const dizimoPago = allEntradas.filter(e=>e.dizimo===true).length;
+  const dizimoTotal = allEntradas.filter(e=>e.dizimo===true).reduce((a,e)=>a+parseFloat(e.valor||0)*0.10,0);
+
+  return {
+    mes: monthLabel(currentMonth),
+    totalEntradas: tEntradas,
+    totalGastos: tGastos,
+    saldo: Math.round((tEntradas-tGastos)*100)/100,
+    gastosPorCategoria,
+    contasObrigatoriasPendentes: fixasPendentes.length,
+    entradasFreelaCount: freelas.length,
+    entradasFixasCount: entradasFixas.length,
+    dizimosRegistrados: dizimoPago,
+    valorDizimoAproximado: Math.round(dizimoTotal*100)/100,
+  };
+}
+
+const ADVISOR_PROMPT_BASE = 'Você é um conselheiro financeiro pessoal. Analise o resumo financeiro do mês (em JSON) de um casal brasileiro e escreva um retorno curto, direto e prático em português, no seguinte formato: um parágrafo inicial resumindo a situação do mês (1-2 frases), seguido de uma lista de 3 a 5 sugestões concretas de melhoria (o que cortar, o que priorizar, alertas se o saldo estiver apertado, etc). Seja específico com base nos números dados, sem generalidades vagas. Não use markdown com ** ou #, escreva em texto corrido com quebras de linha simples entre parágrafos e um traço "-" no início de cada sugestão da lista.';
+
+function renderAdvisorResponse(text){
+  const responseEl = document.getElementById('advisor-response');
+  const blocks = text.trim().split(/\n{2,}/);
+  responseEl.innerHTML = blocks.map(block=>{
+    const lines = block.split('\n').map(l=>l.trim()).filter(Boolean);
+    const isList = lines.length>0 && lines.every(l=>l.startsWith('-'));
+    if(isList){
+      return '<ul>' + lines.map(l=>`<li>${l.replace(/^-\s*/,'')}</li>`).join('') + '</ul>';
+    }
+    return `<p>${block.trim()}</p>`;
+  }).join('');
+}
+
+document.getElementById('btn-run-advisor').addEventListener('click', async ()=>{
+  const apiKey = document.getElementById('advisor-api-key').value.trim();
+  if(!apiKey){ showToast('Insira sua chave API do Gemini','error'); return; }
+
+  document.getElementById('advisor-form-section').style.display = 'none';
+  document.getElementById('advisor-thinking').classList.add('show');
+
+  try{
+    const summary = buildFinanceSummary();
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents:[{ parts:[
+          { text: ADVISOR_PROMPT_BASE + '\n\nDados do mês:\n' + JSON.stringify(summary) }
+        ]}]
+      })
+    });
+    const json = await res.json();
+    if(!res.ok) throw new Error(json.error?.message || 'Erro na API do Gemini');
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if(!text) throw new Error('A IA não retornou nenhuma resposta.');
+
+    document.getElementById('advisor-thinking').classList.remove('show');
+    renderAdvisorResponse(text);
+    document.getElementById('advisor-response').classList.add('show');
+    document.getElementById('advisor-response-actions').style.display = 'flex';
+  } catch(err){
+    document.getElementById('advisor-thinking').classList.remove('show');
+    document.getElementById('advisor-form-section').style.display = 'block';
+    showToast('Erro: '+err.message, 'error');
+  }
+});
+
 requireAuth(()=>{ boot(); });
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </body>
 </html>

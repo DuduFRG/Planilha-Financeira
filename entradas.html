@@ -11,6 +11,9 @@
 <meta name="theme-color" content="#020126">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Finanças">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="shared/style.css">
 <style>
   .manage-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-soft); }
@@ -139,7 +142,7 @@ import { createSelect, createDatePicker, stripLeadingEmoji, parseBRLNumber, bind
 import {
   db, ref, onValue, push, remove, update,
   WHO_OPTIONS, whoLabel, brl, sum, sortByDate,
-  getSavedMonth, subscribeMonth, subscribeEntradasTemplate, seedEntradasFromTemplate
+  getSavedMonth, subscribeMonth, subscribeEntradasTemplate, seedEntradasFromTemplate, isEntradaRecebida
 } from './shared/firebase.js';
 
 renderNav('entradas.html');
@@ -194,7 +197,7 @@ function formaLabel(item){
 function dizimoRow(item){
   const who = item.who ? `<span class="tag tag-who-${item.who}">${whoLabel(item.who)}</span>` : '';
   const dv = item.dizimo === true;
-  const recebido = item.recebido !== false; // legado sem o campo conta como recebido
+  const recebido = isEntradaRecebida(item, currentMonth);
   return `
     <div class="list-row">
       <div class="list-date">${item.data||'—'}</div>
@@ -229,7 +232,7 @@ function freelaRow(item){
 function renderAll(){
   const entradasFixas = (localData.entradas||[]);
   const freelas = (localData.entradasFreela||[]);
-  const entradasFixasRecebidas = entradasFixas.filter(e=>e.recebido !== false);
+  const entradasFixasRecebidas = entradasFixas.filter(e=>isEntradaRecebida(e, currentMonth));
 
   const listFixasEl = document.getElementById('list-fixas');
   const sortedFixas = sortByDate(entradasFixas);
@@ -282,7 +285,7 @@ document.addEventListener('click', e=>{
   if(recebidoBtn){
     const [key, curr] = recebidoBtn.dataset.toggleRecebido.split(':');
     const current = curr === 'true';
-    update(ref(db, `meses/${currentMonth}/entradas/${key}`), { recebido: !current });
+    update(ref(db, `meses/${currentMonth}/entradas/${key}`), { recebidoManual: !current });
     return;
   }
 });
@@ -495,11 +498,16 @@ document.getElementById('modal-freela-save').addEventListener('click', ()=>{
     formaRecebimento: forma,
     parcelas,
   };
-  // Entrada fixa criada/editada manualmente pelo usuário já é considerada recebida
-  // (o status "pendente" é só para as que chegam automaticamente do template).
+  // Entrada fixa criada manualmente pelo usuário já é considerada recebida
+  // (o status "pendente" automático é só para as que chegam via template,
+  // até a data de recebimento chegar no calendário de Brasília).
   if(targetCat==='entradas'){
     const existing = editingKey ? (localData[editingCat]||[]).find(i=>i._key===editingKey) : null;
-    payload.recebido = existing?.recebido ?? true;
+    if(existing && existing.recebidoManual != null){
+      payload.recebidoManual = existing.recebidoManual; // preserva decisão manual já feita
+    } else if(!editingKey){
+      payload.recebidoManual = true; // nova entrada digitada à mão = já recebida
+    }
   }
 
   function afterSave(finalKey){
